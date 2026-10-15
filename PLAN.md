@@ -52,13 +52,15 @@ Los dos de prioridad 3 pueden correr en paralelo una vez que `auth-backend` teng
 
 **Ventana:** 08–21 oct · **Prioridad:** Alta · **Depende de:** `db-engineer`
 
-- [ ] Scaffolding Express por módulos.
-- [ ] `POST /auth/login`.
-- [ ] `POST /auth/bootstrap-owner`.
-- [ ] Middleware JWT (expiración por 30 min de inactividad).
-- [ ] Middleware RBAC (revalida rol y propiedad en cada request, denegación por defecto — FR-030).
-- [ ] Bloqueo de cuenta tras 5 intentos fallidos en 10 minutos (NFR-013).
-- [ ] `POST /users`, `PUT /users/:id`.
+- [x] Scaffolding Express por módulos.
+- [x] `POST /auth/login`.
+- [x] `POST /auth/bootstrap-owner`.
+- [x] Middleware JWT (expiración por 30 min de inactividad).
+- [x] Middleware RBAC (revalida rol y propiedad en cada request, denegación por defecto — FR-030).
+- [x] Bloqueo de cuenta tras 5 intentos fallidos en 10 minutos (NFR-013).
+- [x] `POST /users`, `PUT /users/:id`.
+
+**Hecho el 15 oct 2026** — 45 pruebas pasan, ver `docs/AUTH.md` (incluye decisiones a revisar).
 
 ---
 
