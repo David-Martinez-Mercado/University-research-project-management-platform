@@ -15,7 +15,7 @@ npm run db:smoke                             # prueba de humo (hace rollback, no
 
 ## Aprovisionamiento en Render (producción)
 
-> Pendiente de ejecutar por el dueño de la cuenta de Render: requiere credenciales que no están en el repo.
+> Instancia creada por el dueño de la cuenta. `prisma migrate deploy` y `npm run db:smoke` verificados contra ella el 15 oct 2026. La URL vive solo en `backend/.env` (ignorado por git).
 
 1. Render Dashboard → **New → PostgreSQL** (o `render.yaml` de la raíz como Blueprint). Versión 15+.
 2. Copiar la *Internal Database URL* (backend en Render) o *External Database URL* (desde tu máquina) y guardarla **solo** como variable de entorno `DATABASE_URL` en Render / en un `.env` local (ignorado por git). Añadir `?sslmode=require` a la URL externa.

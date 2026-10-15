@@ -40,13 +40,14 @@ async function main() {
         )
       )[0].id;
       // extra rows so the planner has something to rank
-      for (let n = 1; n <= 50; n++) {
-        await tx.$executeRawUnsafe(
-          `INSERT INTO document_chunks (id, document_id, chunk_index, content, embedding_vector)
-           VALUES (gen_random_uuid(), $1::uuid, $2, 'filler', $3::vector)`,
-          doc.id, n, vec(n + 1),
-        );
-      }
+      // single round trip (remote databases make per-row inserts slow)
+      await tx.$executeRawUnsafe(
+        `INSERT INTO document_chunks (id, document_id, chunk_index, content, embedding_vector)
+         SELECT gen_random_uuid(), $1::uuid, n, 'filler',
+                (SELECT array_agg(sin(n + 1 + i))::vector(${DIM}) FROM generate_series(0, ${DIM - 1}) i)
+         FROM generate_series(1, 50) n`,
+        doc.id,
+      );
       const criterion = await tx.evaluationCriterion.create({ data: { name: 'Originality', createdById: admin.id } });
       const assignment = await tx.judgeAssignment.create({ data: { projectId: project.id, judgeId: judge.id, assignedById: admin.id } });
       await tx.evaluation.create({ data: { assignmentId: assignment.id, criterionId: criterion.id, score: 8.5 } });
@@ -86,7 +87,7 @@ async function main() {
       report.push('PASS  HNSW index used for similarity search');
 
       throw new Rollback();
-    });
+    }, { maxWait: 30_000, timeout: 120_000 });
   } catch (e) {
     if (!(e instanceof Rollback)) {
       console.error(report.join('\n'));

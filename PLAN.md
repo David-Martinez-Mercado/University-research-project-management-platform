@@ -38,7 +38,7 @@ Los dos de prioridad 3 pueden correr en paralelo una vez que `auth-backend` teng
 
 **Vencimiento original:** 14 oct (vencida) · **Prioridad:** Alta
 
-- [ ] Instancia de PostgreSQL en Render con `pgvector` habilitado. *(documentado en `docs/DATABASE.md` + `render.yaml`; pendiente de crear en la cuenta de Render — verificado solo contra PostgreSQL 16 + pgvector 0.8.7 local en Docker)*
+- [x] Instancia de PostgreSQL en Render con `pgvector` habilitado (migraciones y `db:smoke` verificados contra Render el 15 oct 2026).
 - [x] Migraciones versionadas de las 12 entidades + llaves foráneas.
 - [x] Índice HNSW sobre `DOCUMENT_CHUNK.embedding_vector` (NFR-002) + índices de las demás FK.
 - [x] `.env.example` documentado, sin credenciales reales.

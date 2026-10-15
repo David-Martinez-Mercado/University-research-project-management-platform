@@ -13,6 +13,6 @@ A comprehensive platform for research project management and development, design
 
 ## Estado
 
-- [x] Fase 1 — Base de datos (`db-engineer`): ver `docs/DATABASE.md`
+- [x] Fase 1 — Base de datos (`db-engineer`): completa, local y Render — ver `docs/DATABASE.md`
 - [ ] Fase 2 — Auth & RBAC (`auth-backend`)
 - [ ] Fase 3 — Módulos de negocio (`business-backend`) y Frontend (`frontend-ui`)
