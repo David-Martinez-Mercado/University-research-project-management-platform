@@ -1,0 +1,331 @@
+// University Research Project Management Platform — database schema.
+//
+// NOTE: column-level details are based on the entity list in the Design Document
+// and the requirements referenced in the plan (FR-010, FR-029, NFR-002, NFR-013, BR-007).
+// The Design Document's data dictionary (.docx) was not available in the repo, so
+// every assumption is listed in docs/DATABASE.md. Adjust via a new migration if the
+// dictionary differs.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+// ───────────────────────── Enums ─────────────────────────
+
+enum Role {
+  INVESTOR
+  RESEARCHER
+  JUDGE
+  STUDENT
+  ADMINISTRATOR
+}
+
+// Lifecycle: DRAFT → SUBMITTED → UNDER_EVALUATION → EVALUATED → ARCHIVED.
+// Transition rules are enforced in business-backend, not in the database.
+enum ProjectStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_EVALUATION
+  EVALUATED
+  ARCHIVED
+}
+
+enum CollaboratorRole {
+  LEAD
+  MEMBER
+}
+
+enum DocumentType {
+  PROPOSAL
+  REPORT
+  DATASET
+  PUBLICATION
+  OTHER
+}
+
+enum IngestionStatus {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum AssignmentStatus {
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum EvaluationStatus {
+  DRAFT
+  SUBMITTED
+}
+
+enum NotificationType {
+  PROJECT_STATUS
+  JUDGE_ASSIGNED
+  EVALUATION_SUBMITTED
+  DOCUMENT_UPLOADED
+  COLLABORATOR_ADDED
+  SYSTEM
+}
+
+// ───────────────────────── Entities ─────────────────────────
+
+model User {
+  id                 String    @id @default(uuid()) @db.Uuid
+  email              String    @unique
+  passwordHash       String    @map("password_hash")
+  fullName           String    @map("full_name")
+  role               Role
+  // Institution / department. Used by the judge conflict-of-interest check (FR-010).
+  affiliation        String?
+  isActive           Boolean   @default(true) @map("is_active")
+  // The first Administrator created via POST /auth/bootstrap-owner.
+  isOwner            Boolean   @default(false) @map("is_owner")
+  // Account lockout: 5 failed attempts within 10 minutes (NFR-013).
+  failedLoginCount   Int       @default(0) @map("failed_login_count")
+  firstFailedLoginAt DateTime? @map("first_failed_login_at") @db.Timestamptz(6)
+  lockedUntil        DateTime? @map("locked_until") @db.Timestamptz(6)
+  lastLoginAt        DateTime? @map("last_login_at") @db.Timestamptz(6)
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  ownedProjects     Project[]
+  collaborations    ProjectCollaborator[]
+  uploadedDocuments Document[]
+  judgeAssignments  JudgeAssignment[]     @relation("AssignmentJudge")
+  assignmentsMade   JudgeAssignment[]     @relation("AssignmentAssigner")
+  investorLinks     InvestorProjectLink[] @relation("LinkInvestor")
+  linksCreated      InvestorProjectLink[] @relation("LinkCreator")
+  notifications     Notification[]
+  aiInteractions    AiInteractionLog[]
+  criteriaCreated   EvaluationCriterion[]
+
+  @@map("users")
+}
+
+model Project {
+  id           String        @id @default(uuid()) @db.Uuid
+  ownerId      String        @map("owner_id") @db.Uuid
+  title        String
+  summary      String?
+  description  String?
+  researchArea String?       @map("research_area")
+  // Institution the project is affiliated with. Used by the judge conflict-of-interest check (FR-010).
+  affiliation  String?
+  status       ProjectStatus @default(DRAFT)
+  submittedAt  DateTime?     @map("submitted_at") @db.Timestamptz(6)
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  owner            User                  @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  collaborators    ProjectCollaborator[]
+  documents        Document[]
+  judgeAssignments JudgeAssignment[]
+  investorLinks    InvestorProjectLink[]
+  notifications    Notification[]
+  aiInteractions   AiInteractionLog[]
+
+  @@index([ownerId])
+  @@index([status])
+  @@map("projects")
+}
+
+model ProjectCollaborator {
+  id        String           @id @default(uuid()) @db.Uuid
+  projectId String           @map("project_id") @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  role      CollaboratorRole @default(MEMBER)
+  addedAt   DateTime         @default(now()) @map("added_at") @db.Timestamptz(6)
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([userId])
+  @@map("project_collaborators")
+}
+
+model Document {
+  id              String          @id @default(uuid()) @db.Uuid
+  projectId       String          @map("project_id") @db.Uuid
+  uploadedById    String          @map("uploaded_by_id") @db.Uuid
+  fileName        String          @map("file_name")
+  mimeType        String          @map("mime_type")
+  sizeBytes       BigInt          @map("size_bytes")
+  type            DocumentType    @default(OTHER)
+  // Object-storage key / path of the uploaded file.
+  storageKey      String          @map("storage_key")
+  ingestionStatus IngestionStatus @default(PENDING) @map("ingestion_status")
+  uploadedAt      DateTime        @default(now()) @map("uploaded_at") @db.Timestamptz(6)
+
+  project    Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  uploadedBy User            @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+  chunks     DocumentChunk[]
+
+  @@index([projectId])
+  @@index([uploadedById])
+  @@map("documents")
+}
+
+model DocumentChunk {
+  id              String                       @id @default(uuid()) @db.Uuid
+  documentId      String                       @map("document_id") @db.Uuid
+  chunkIndex      Int                          @map("chunk_index")
+  content         String
+  pageNumber      Int?                         @map("page_number")
+  tokenCount      Int?                         @map("token_count")
+  // 1536 dimensions assumed (e.g. OpenAI text-embedding-3-small). Changing the
+  // embedding model requires a migration + re-embedding. HNSW index is created in
+  // the migration SQL (Prisma cannot express it).
+  embeddingVector Unsupported("vector(1536)")? @map("embedding_vector")
+  createdAt       DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  document        Document            @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  retrievalAudits RetrievalAuditLog[]
+
+  @@unique([documentId, chunkIndex])
+  @@map("document_chunks")
+}
+
+model EvaluationCriterion {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  description String?
+  maxScore    Int      @default(10) @map("max_score")
+  weight      Decimal  @default(1.0) @db.Decimal(5, 2)
+  position    Int      @default(0)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdById String?  @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  createdBy   User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  evaluations Evaluation[]
+
+  @@index([createdById])
+  @@map("evaluation_criteria")
+}
+
+model JudgeAssignment {
+  id           String           @id @default(uuid()) @db.Uuid
+  projectId    String           @map("project_id") @db.Uuid
+  judgeId      String           @map("judge_id") @db.Uuid
+  assignedById String           @map("assigned_by_id") @db.Uuid
+  status       AssignmentStatus @default(ASSIGNED)
+  assignedAt   DateTime         @default(now()) @map("assigned_at") @db.Timestamptz(6)
+  completedAt  DateTime?        @map("completed_at") @db.Timestamptz(6)
+
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  judge       User         @relation("AssignmentJudge", fields: [judgeId], references: [id], onDelete: Restrict)
+  assignedBy  User         @relation("AssignmentAssigner", fields: [assignedById], references: [id], onDelete: Restrict)
+  evaluations Evaluation[]
+
+  @@unique([projectId, judgeId])
+  @@index([judgeId])
+  @@index([assignedById])
+  @@map("judge_assignments")
+}
+
+// One row per (assignment, criterion). status = DRAFT supports draft recovery (FR-029).
+model Evaluation {
+  id           String           @id @default(uuid()) @db.Uuid
+  assignmentId String           @map("assignment_id") @db.Uuid
+  criterionId  String           @map("criterion_id") @db.Uuid
+  score        Decimal?         @db.Decimal(5, 2)
+  comments     String?
+  status       EvaluationStatus @default(DRAFT)
+  submittedAt  DateTime?        @map("submitted_at") @db.Timestamptz(6)
+  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  assignment JudgeAssignment     @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  criterion  EvaluationCriterion @relation(fields: [criterionId], references: [id], onDelete: Restrict)
+
+  @@unique([assignmentId, criterionId])
+  @@index([criterionId])
+  @@map("evaluations")
+}
+
+// Explicit investor ↔ project grant. Investor dashboards are scoped to these rows (BR-007).
+model InvestorProjectLink {
+  id         String   @id @default(uuid()) @db.Uuid
+  investorId String   @map("investor_id") @db.Uuid
+  projectId  String   @map("project_id") @db.Uuid
+  linkedById String   @map("linked_by_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  investor User    @relation("LinkInvestor", fields: [investorId], references: [id], onDelete: Cascade)
+  project  Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  linkedBy User    @relation("LinkCreator", fields: [linkedById], references: [id], onDelete: Restrict)
+
+  @@unique([investorId, projectId])
+  @@index([projectId])
+  @@index([linkedById])
+  @@map("investor_project_links")
+}
+
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  projectId String?          @map("project_id") @db.Uuid
+  type      NotificationType @default(SYSTEM)
+  title     String
+  message   String
+  isRead    Boolean          @default(false) @map("is_read")
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  readAt    DateTime?        @map("read_at") @db.Timestamptz(6)
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([userId, isRead])
+  @@index([projectId])
+  @@map("notifications")
+}
+
+model AiInteractionLog {
+  id               String   @id @default(uuid()) @db.Uuid
+  userId           String   @map("user_id") @db.Uuid
+  projectId        String?  @map("project_id") @db.Uuid
+  prompt           String
+  response         String?
+  model            String?
+  promptTokens     Int?     @map("prompt_tokens")
+  completionTokens Int?     @map("completion_tokens")
+  latencyMs        Int?     @map("latency_ms")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user            User                @relation(fields: [userId], references: [id], onDelete: Restrict)
+  project         Project?            @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  retrievalAudits RetrievalAuditLog[]
+
+  @@index([userId])
+  @@index([projectId])
+  @@map("ai_interaction_logs")
+}
+
+// Which chunks were retrieved for which AI interaction, with similarity score and rank.
+model RetrievalAuditLog {
+  id              String   @id @default(uuid()) @db.Uuid
+  interactionId   String   @map("interaction_id") @db.Uuid
+  chunkId         String   @map("chunk_id") @db.Uuid
+  similarityScore Float    @map("similarity_score")
+  rank            Int
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  interaction AiInteractionLog @relation(fields: [interactionId], references: [id], onDelete: Cascade)
+  chunk       DocumentChunk    @relation(fields: [chunkId], references: [id], onDelete: Restrict)
+
+  @@index([interactionId])
+  @@index([chunkId])
+  @@map("retrieval_audit_logs")
+}

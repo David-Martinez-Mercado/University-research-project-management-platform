@@ -1,0 +1,22 @@
+{
+  "name": "urpmp-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "University Research Project Management Platform - backend API",
+  "scripts": {
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:generate": "prisma generate",
+    "db:smoke": "tsx scripts/db-smoke-test.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.3",
+    "prisma": "^6.19.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "dotenv": "^18.0.8",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}

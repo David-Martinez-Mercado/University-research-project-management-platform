@@ -1,0 +1,22 @@
+# Local development database: PostgreSQL 16 + pgvector.
+# Production uses a managed PostgreSQL instance on Render (see docs/DATABASE.md).
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: urpmp-db
+    environment:
+      POSTGRES_USER: urpmp
+      POSTGRES_PASSWORD: urpmp_dev_password
+      POSTGRES_DB: urpmp
+    ports:
+      - "5544:5432"
+    volumes:
+      - urpmp-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U urpmp -d urpmp"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  urpmp-db-data:

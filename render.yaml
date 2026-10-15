@@ -1,0 +1,8 @@
+# Render Blueprint — database only for now (backend service is added by auth-backend).
+# NOT yet applied/verified against a Render account. Plan name may need adjusting in the dashboard.
+databases:
+  - name: urpmp-db
+    databaseName: urpmp
+    user: urpmp
+    plan: basic-256mb
+    postgresMajorVersion: "16"
