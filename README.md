@@ -9,6 +9,7 @@ A comprehensive platform for research project management and development, design
 | `PLAN.md` | Plan de trabajo semanal (12–18 oct 2026) |
 | `backend/` | API Node.js/Express + Prisma (esquema y migraciones en `backend/prisma/`) |
 | `docs/AUTH.md` | Auth, JWT, RBAC, bloqueo de cuenta: endpoints y decisiones |
+| `docs/PROJECTS.md` | Proyectos: endpoints, matriz de roles, ciclo de estados, alcance de lectura |
 | `docs/DATABASE.md` | Base de datos: setup local, Render, supuestos de modelado |
 | `docker-compose.yml` | PostgreSQL 16 + pgvector para desarrollo local |
 

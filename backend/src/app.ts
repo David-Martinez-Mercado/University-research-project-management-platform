@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import { authRouter } from './auth/auth.routes';
 import { env } from './config/env';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
+import { projectsRouter } from './projects/projects.routes';
 import { usersRouter } from './users/users.routes';
 
 export function createApp() {
@@ -29,6 +30,7 @@ export function createApp() {
 
   app.use('/auth', authRouter);
   app.use('/users', usersRouter);
+  app.use('/projects', projectsRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

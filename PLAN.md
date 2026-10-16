@@ -68,12 +68,14 @@ Los dos de prioridad 3 pueden correr en paralelo una vez que `auth-backend` teng
 
 **Ventana:** 15 oct–11 nov (arranca hoy) · **Prioridad:** Alta · **Depende de:** `auth-backend`
 
-- [ ] Modelo de Proyecto y ciclo de estado (`Draft → Submitted → Under evaluation → …`).
+- [x] Modelo de Proyecto y ciclo de estado (`Draft → Submitted → Under evaluation → …`).
 - [ ] Carga de documentos con validación de tipo y tamaño.
 - [ ] Asignación de Jueces con verificación de conflicto de interés (FR-010).
 - [ ] Flujo de evaluación con recuperación de borrador (FR-029).
 - [ ] Dashboard de Inversionista con alcance limitado por proyecto vinculado (BR-007).
 - [ ] Sistema de notificaciones in-app.
+
+**Hecho el 16 oct 2026:** modelo de Proyecto, ciclo de estados, CRUD de `/projects` y colaboradores (82 pruebas pasan, ver `docs/PROJECTS.md`). Siguen abiertos: documentos, jueces/FR-010, evaluación/FR-029, dashboard de inversionista/BR-007 y notificaciones.
 
 **Alcance realista esta semana:** modelo de Proyecto + CRUD básico de `/projects`. El resto sigue la próxima semana.
 
