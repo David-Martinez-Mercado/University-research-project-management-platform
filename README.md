@@ -8,6 +8,7 @@ A comprehensive platform for research project management and development, design
 | `.claude/agents/` | Subagentes de Claude Code: `db-engineer`, `auth-backend`, `business-backend`, `frontend-ui` |
 | `PLAN.md` | Plan de trabajo semanal (12–18 oct 2026) |
 | `backend/` | API Node.js/Express + Prisma (esquema y migraciones en `backend/prisma/`) |
+| `frontend/` | React + TypeScript + Tailwind (Vite): librería de componentes, Login, Dashboard mínimo |
 | `docs/AUTH.md` | Auth, JWT, RBAC, bloqueo de cuenta: endpoints y decisiones |
 | `docs/PROJECTS.md` | Proyectos: endpoints, matriz de roles, ciclo de estados, alcance de lectura |
 | `docs/DATABASE.md` | Base de datos: setup local, Render, supuestos de modelado |

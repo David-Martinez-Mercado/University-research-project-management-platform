@@ -85,10 +85,12 @@ Los dos de prioridad 3 pueden correr en paralelo una vez que `auth-backend` teng
 
 **Ventana:** 08 oct–18 nov · **Prioridad:** Alta · **Depende de:** `auth-backend` (puede usar mocks)
 
-- [ ] Scaffolding (Vite + React + TS + Tailwind).
-- [ ] Librería de componentes compartida (botón, input, card, nav).
-- [ ] Pantalla de Login conectada a `/auth/login` (real o mock marcado).
+- [x] Scaffolding (Vite + React + TS + Tailwind).
+- [x] Librería de componentes compartida (botón, input, card, nav).
+- [x] Pantalla de Login conectada a `/auth/login` (real o mock marcado).
 - [ ] Dashboard, Workspace del proyecto, Evaluación (Judge), Dashboard de Inversionista, Panel de Administración — continúan en sprints siguientes.
+
+**Hecho el 16 oct 2026** — Login contra el backend real + Dashboard mínimo (aún no adaptado por rol); 22 pruebas pasan, ver `frontend/README.md`. Abiertas: dashboards por rol, workspace del proyecto, evaluación, inversionista y panel de administración.
 
 ---
 
