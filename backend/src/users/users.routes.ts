@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { authorize } from '../middleware/authorize';
-import { createUserSchema, idParamSchema, updateUserSchema } from './users.schemas';
-import { createUser, getUser, updateUser } from './users.service';
+import { createUserSchema, idParamSchema, listUsersQuerySchema, updateUserSchema } from './users.schemas';
+import { createUser, getUser, listUsers, updateUser } from './users.service';
 
 export const usersRouter = Router();
 
@@ -13,6 +13,16 @@ usersRouter.post(
   asyncHandler(async (req, res) => {
     const input = createUserSchema.parse(req.body);
     res.status(201).json(await createUser(input));
+  }),
+);
+
+// Declared before '/:id'; the two never overlap (this one has no path parameter).
+usersRouter.get(
+  '/',
+  ...authorize({ roles: ['ADMINISTRATOR'] }),
+  asyncHandler(async (req, res) => {
+    const query = listUsersQuerySchema.parse(req.query);
+    res.json(await listUsers(query));
   }),
 );
 

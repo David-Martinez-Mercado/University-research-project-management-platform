@@ -24,12 +24,29 @@ const schema = z
     // Guards POST /auth/bootstrap-owner. Required in production.
     BOOTSTRAP_OWNER_SECRET: optionalString,
     CORS_ORIGIN: z.string().default('http://localhost:5173'),
+    // Uploaded project documents. Local disk for now (ephemeral on Render — see docs/ROADMAP.md).
+    UPLOAD_DIR: z.string().default('uploads'),
+    MAX_UPLOAD_MB: z.coerce.number().positive().default(10),
+    // AI/RAG embeddings (see docs/AI_RAG.md). `mock` is deterministic and offline (dev/test only).
+    EMBEDDING_PROVIDER: z.enum(['mock', 'openai']).default('mock'),
+    EMBEDDING_API_KEY: optionalString,
+    EMBEDDING_API_URL: z.string().url().default('https://api.openai.com/v1/embeddings'),
+    EMBEDDING_MODEL: z.string().min(1).default('text-embedding-3-small'),
+    EMBEDDING_BATCH_SIZE: z.coerce.number().int().min(1).max(2048).default(64),
+    EMBEDDING_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
     RATE_LIMIT_ENABLED: z
       .enum(['true', 'false'])
       .default('true')
       .transform((v) => v === 'true'),
   })
   .superRefine((cfg, ctx) => {
+    if (cfg.EMBEDDING_PROVIDER === 'openai' && !cfg.EMBEDDING_API_KEY) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['EMBEDDING_API_KEY'],
+        message: 'EMBEDDING_API_KEY is required when EMBEDDING_PROVIDER=openai',
+      });
+    }
     if (cfg.NODE_ENV === 'production' && !cfg.BOOTSTRAP_OWNER_SECRET) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

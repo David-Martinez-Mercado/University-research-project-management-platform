@@ -1,5 +1,6 @@
 import { Role } from '@prisma/client';
 import { z } from 'zod';
+import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../projects/projects.schemas';
 
 export const email = z.string().trim().toLowerCase().email().max(254);
 
@@ -33,7 +34,27 @@ export const updateUserSchema = z
   .partial()
   .refine((v) => Object.keys(v).length > 0, 'At least one field is required');
 
+export const listUsersQuerySchema = z.object({
+  role: roleSchema.optional(),
+  // Case-insensitive substring match on email or full name. Blank = no filter.
+  q: z
+    .string()
+    .trim()
+    .max(100)
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined)),
+  // Capped, not rejected (same convention as GET /projects).
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .default(DEFAULT_PAGE_SIZE)
+    .transform((n) => Math.min(n, MAX_PAGE_SIZE)),
+  offset: z.coerce.number().int().min(0).max(1_000_000).default(0),
+});
+
 export const idParamSchema = z.object({ id: z.string().uuid() });
 
 export type CreateUserInput = z.infer<typeof createUserSchema>;
+export type ListUsersQuery = z.infer<typeof listUsersQuerySchema>;
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;

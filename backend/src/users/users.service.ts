@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import { env } from '../config/env';
 import { prisma } from '../db/prisma';
 import { HttpError } from '../errors';
-import type { CreateUserInput, UpdateUserInput } from './users.schemas';
+import type { CreateUserInput, ListUsersQuery, UpdateUserInput } from './users.schemas';
 
 /** Shape returned by the API: never includes password hash or lockout internals. */
 export function toPublicUser(user: User) {
@@ -44,6 +44,33 @@ export async function createUser(input: CreateUserInput, extra: { isOwner?: bool
     if (isUniqueViolation(err)) throw new HttpError(409, 'A user with this email already exists');
     throw err;
   }
+}
+
+// Prisma's `contains` does not escape LIKE wildcards; PostgreSQL's default LIKE escape is a backslash.
+const escapeLike = (v: string) => v.replace(/[\\%_]/g, (c) => `\\${c}`);
+
+export async function listUsers(query: ListUsersQuery) {
+  const where: Prisma.UserWhereInput = {
+    ...(query.role ? { role: query.role } : {}),
+    ...(query.q
+      ? {
+          OR: [
+            { email: { contains: escapeLike(query.q), mode: 'insensitive' } },
+            { fullName: { contains: escapeLike(query.q), mode: 'insensitive' } },
+          ],
+        }
+      : {}),
+  };
+  const [rows, total] = await prisma.$transaction([
+    prisma.user.findMany({
+      where,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: query.limit,
+      skip: query.offset,
+    }),
+    prisma.user.count({ where }),
+  ]);
+  return { data: rows.map(toPublicUser), total, limit: query.limit, offset: query.offset };
 }
 
 export async function getUser(id: string) {

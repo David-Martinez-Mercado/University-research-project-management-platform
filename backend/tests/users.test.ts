@@ -112,6 +112,91 @@ describe('PUT /users/:id', () => {
   });
 });
 
+describe('GET /users', () => {
+  async function seedUsers() {
+    const { admin, token } = await adminToken();
+    const alice = await makeUser('JUDGE', { email: 'alice.judge@test.local' });
+    const bob = await makeUser('JUDGE', { email: 'bob@example.org' });
+    const carol = await makeUser('RESEARCHER', { email: 'carol@test.local' });
+    await prisma.user.update({ where: { id: alice.id }, data: { fullName: 'Alice Johnson' } });
+    await prisma.user.update({ where: { id: bob.id }, data: { fullName: 'Bob Stone' } });
+    await prisma.user.update({ where: { id: carol.id }, data: { fullName: 'Carol 100%_Done' } });
+    return { admin, token, alice, bob, carol };
+  }
+
+  it('requires authentication (401) and administrator role (403)', async () => {
+    expect((await api().get('/users')).status).toBe(401);
+    for (const role of ['RESEARCHER', 'STUDENT', 'JUDGE', 'INVESTOR'] as const) {
+      const u = await makeUser(role);
+      const { token } = await loginAs(u.email);
+      expect((await api().get('/users').set(bearer(token))).status).toBe(403);
+    }
+  });
+
+  it('lists users in the public shape (no password hash or lockout internals) with pagination metadata', async () => {
+    const { token } = await seedUsers();
+    const res = await api().get('/users').set(bearer(token));
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ total: 4, limit: 20, offset: 0 });
+    expect(res.body.data).toHaveLength(4);
+    expect(Object.keys(res.body.data[0]).sort()).toEqual(
+      ['affiliation', 'createdAt', 'email', 'fullName', 'id', 'isActive', 'isOwner', 'lastLoginAt', 'role', 'updatedAt'].sort(),
+    );
+    expect(JSON.stringify(res.body)).not.toMatch(/password|failedLogin|lockedUntil/i);
+  });
+
+  it('filters by role', async () => {
+    const { token } = await seedUsers();
+    const res = await api().get('/users?role=JUDGE').set(bearer(token));
+    expect(res.body.total).toBe(2);
+    expect(res.body.data.every((u: { role: string }) => u.role === 'JUDGE')).toBe(true);
+    expect((await api().get('/users?role=KING').set(bearer(token))).status).toBe(400);
+  });
+
+  it('q matches email or full name, case-insensitively, and combines with role', async () => {
+    const { token } = await seedUsers();
+    const emails = async (qs: string) =>
+      ((await api().get(`/users?${qs}`).set(bearer(token))).body.data as Array<{ email: string }>).map((u) => u.email).sort();
+
+    expect(await emails('q=ALICE')).toEqual(['alice.judge@test.local']); // full name, other case
+    expect(await emails('q=example.ORG')).toEqual(['bob@example.org']); // email, other case
+    expect(await emails('q=stone')).toEqual(['bob@example.org']);
+    expect(await emails('q=test.local&role=JUDGE')).toEqual(['alice.judge@test.local']);
+    expect(await emails('q=zzz-no-match')).toEqual([]);
+    expect(await emails('q=%20%20')).toHaveLength(4); // blank q = no filter
+  });
+
+  it('treats LIKE wildcards in q literally', async () => {
+    const { token } = await seedUsers();
+    const res = await api().get(`/users?q=${encodeURIComponent('100%_')}`).set(bearer(token));
+    expect(res.body.data.map((u: { email: string }) => u.email)).toEqual(['carol@test.local']);
+    expect((await api().get(`/users?q=${encodeURIComponent('%')}`).set(bearer(token))).body.total).toBe(1);
+    expect((await api().get(`/users?q=${encodeURIComponent('_')}`).set(bearer(token))).body.total).toBe(1);
+  });
+
+  it('paginates with limit/offset and caps limit at 100', async () => {
+    const { token } = await seedUsers();
+    const first = await api().get('/users?limit=2&offset=0').set(bearer(token));
+    const second = await api().get('/users?limit=2&offset=2').set(bearer(token));
+    expect(first.body.data).toHaveLength(2);
+    expect(second.body.data).toHaveLength(2);
+    expect(first.body.total).toBe(4);
+    const ids = [...first.body.data, ...second.body.data].map((u: { id: string }) => u.id);
+    expect(new Set(ids).size).toBe(4); // stable ordering, no overlap
+    expect((await api().get('/users?limit=100000').set(bearer(token))).body.limit).toBe(100);
+    expect((await api().get('/users?limit=0').set(bearer(token))).status).toBe(400);
+    expect((await api().get('/users?offset=-1').set(bearer(token))).status).toBe(400);
+    expect((await api().get('/users?limit=abc').set(bearer(token))).status).toBe(400);
+  });
+
+  it('does not collide with GET /users/:id', async () => {
+    const { admin, token } = await seedUsers();
+    const one = await api().get(`/users/${admin.id}`).set(bearer(token));
+    expect(one.status).toBe(200);
+    expect(one.body.id).toBe(admin.id);
+  });
+});
+
 describe('misc', () => {
   it('health check is public and unknown routes 404', async () => {
     expect((await api().get('/health')).status).toBe(200);

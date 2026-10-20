@@ -3,6 +3,9 @@ import express from 'express';
 import helmet from 'helmet';
 import { authRouter } from './auth/auth.routes';
 import { env } from './config/env';
+import { criteriaRouter, rubricRouter } from './criteria/criteria.routes';
+import { documentsRouter } from './documents/documents.routes';
+import { judgeAssignmentsRouter, judgesRouter } from './judging/judging.routes';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { projectsRouter } from './projects/projects.routes';
 import { usersRouter } from './users/users.routes';
@@ -31,6 +34,11 @@ export function createApp() {
   app.use('/auth', authRouter);
   app.use('/users', usersRouter);
   app.use('/projects', projectsRouter);
+  app.use('/projects', documentsRouter);
+  app.use('/projects', rubricRouter);
+  app.use('/criteria', criteriaRouter);
+  app.use('/judge-assignments', judgeAssignmentsRouter);
+  app.use('/judges', judgesRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
