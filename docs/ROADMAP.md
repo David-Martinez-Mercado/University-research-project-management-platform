@@ -29,7 +29,7 @@
 
 ---
 
-## Semana 2 · 19–25 oct — Documentos, jueces e ingestión de IA
+## Semana 2 · 19–25 oct — Documentos, jueces e ingestión de IA ✅ COMPLETADA (20 oct)
 
 | Actividad | Ficha | Requisito |
 |---|---|---|
@@ -41,6 +41,8 @@
 | Dashboards adaptados por rol + workspace del proyecto (Overview, Documentos, Colaboradores) | Frontend | — |
 
 **Entregable:** un investigador crea un proyecto, sube un documento y queda indexado en pgvector; un administrador asigna un juez y el sistema **rechaza** la asignación si hay conflicto de interés; cada rol ve su propio dashboard.
+
+**Verificado el 20 oct:** 304 pruebas de backend (por archivo) y 93 de frontend; prueba de punta a punta con servidor real: subida → `READY` con 1 fragmento de 1536 dimensiones; asignación con misma afiliación → 422, con otra afiliación → 201; 63 comprobaciones de navegador del agente de frontend. *Limitaciones:* embeddings simulados (sin llave de proveedor), almacenamiento en disco local, y sin revisión manual con lector de pantalla o teléfono real.
 
 ---
 

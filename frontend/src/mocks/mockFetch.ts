@@ -1,72 +1,100 @@
-// MOCK API - a drop-in replacement for `fetch` that only exists when VITE_USE_MOCKS=true.
-// It mirrors the real backend's contract for POST /auth/login and GET /auth/me, including
-// the sliding-session X-Auth-Token header and the 400 / 401 / 423 error shapes.
-import {
-  MOCK_LOCKED_EMAIL,
-  MOCK_LOCKED_RETRY_SECONDS,
-  MOCK_PASSWORD,
-  MOCK_USERS,
-} from './data';
+// MOCK API - only bundled when VITE_USE_MOCKS=true.
+//
+// It simulates ONLY what the real backend cannot serve yet: the documents endpoints
+//   GET  /projects/:id/documents
+//   POST /projects/:id/documents            (multipart: type, file)
+//   GET  /projects/:id/documents/:docId/download
+// Everything else (/auth/*, /projects/*, collaborators) is passed straight to the real network, so the
+// session and project data are real. Delete this folder and the flag once the documents backend ships.
+import type { DocumentType, IngestionStatus, ProjectDocument } from '../api/types';
 
-const TOKEN_PREFIX = 'mock-token.';
 const LATENCY_MS = 300;
+const MAX_BYTES = 10 * 1024 * 1024;
+const ALLOWED_EXT = ['pdf', 'docx', 'txt', 'md'];
+const TYPES: DocumentType[] = ['PROPOSAL', 'REPORT', 'DATASET', 'PUBLICATION', 'OTHER'];
 
-const json = (status: number, body: unknown, headers: Record<string, string> = {}) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json', ...headers },
-  });
-
-const newToken = (userId: string) => `${TOKEN_PREFIX}${userId}.${Date.now()}`;
-
-function login(rawBody: string | undefined): Response {
-  const { email, password } = JSON.parse(rawBody ?? '{}') as { email?: string; password?: string };
-  const normalized = (email ?? '').trim().toLowerCase();
-
-  if (!/^\S+@\S+\.\S+$/.test(normalized)) {
-    return json(400, {
-      error: 'Validation failed',
-      details: [{ path: 'email', message: 'Invalid email' }],
-    });
-  }
-  if (!password) {
-    return json(400, {
-      error: 'Validation failed',
-      details: [{ path: 'password', message: 'String must contain at least 1 character(s)' }],
-    });
-  }
-  if (normalized === MOCK_LOCKED_EMAIL) {
-    return json(
-      423,
-      {
-        error: 'Account temporarily locked after too many failed attempts',
-        retryAfterSeconds: MOCK_LOCKED_RETRY_SECONDS,
-      },
-      { 'Retry-After': String(MOCK_LOCKED_RETRY_SECONDS) },
-    );
-  }
-  const user = MOCK_USERS.find((u) => u.email === normalized);
-  if (!user || password !== MOCK_PASSWORD) {
-    return json(401, { error: 'Invalid email or password' });
-  }
-  return json(200, { token: newToken(user.id), expiresInSeconds: 1800, user });
+interface StoredDoc extends ProjectDocument {
+  /** Mock ingestion advances with time: PENDING -> PROCESSING -> READY. */
+  createdMs: number;
+  content: ArrayBuffer;
 }
 
-function me(authorization: string | null): Response {
-  const token = authorization?.replace(/^Bearer\s+/i, '');
-  const userId = token?.startsWith(TOKEN_PREFIX) ? token.split('.')[1] : undefined;
-  const user = MOCK_USERS.find((u) => u.id === userId);
-  if (!user) return json(401, { error: 'Invalid or expired token' });
-  return json(200, user, { 'X-Auth-Token': newToken(user.id) });
+/** In-memory only: reloading the page clears every mocked document. */
+const store = new Map<string, StoredDoc[]>();
+
+const json = (status: number, body: unknown) =>
+  new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+
+function ingestionStatus(doc: StoredDoc): IngestionStatus {
+  const age = Date.now() - doc.createdMs;
+  if (age < 3000) return 'PENDING';
+  if (age < 6000) return 'PROCESSING';
+  return 'READY';
+}
+
+function publicDoc(doc: StoredDoc): ProjectDocument {
+  const { createdMs: _c, content: _b, ...rest } = doc;
+  void _c;
+  void _b;
+  return { ...rest, ingestionStatus: ingestionStatus(doc) };
+}
+
+/** Best-effort id of the caller from the JWT payload (the mock never validates the token). */
+function callerId(authorization: string | null): string {
+  try {
+    const payload = authorization?.replace(/^Bearer\s+/i, '').split('.')[1] ?? '';
+    const data = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/'))) as { id?: string; sub?: string };
+    return data.id ?? data.sub ?? 'mock-user';
+  } catch {
+    return 'mock-user';
+  }
+}
+
+async function upload(projectId: string, body: BodyInit | null | undefined, authorization: string | null) {
+  if (!(body instanceof FormData)) return json(400, { error: 'Expected multipart/form-data' });
+  const file = body.get('file');
+  const type = body.get('type');
+  if (!(file instanceof File)) return json(400, { error: 'Missing file' });
+  if (typeof type !== 'string' || !TYPES.includes(type as DocumentType)) {
+    return json(400, { error: 'Validation failed', details: [{ path: 'type', message: 'Invalid enum value' }] });
+  }
+  if (file.size > MAX_BYTES) return json(413, { error: 'Payload too large' });
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+  if (!ALLOWED_EXT.includes(ext)) return json(415, { error: `Unsupported file type; allowed extensions: ${ALLOWED_EXT.join(', ')}` });
+
+  const doc: StoredDoc = {
+    id: crypto.randomUUID(),
+    projectId,
+    fileName: file.name,
+    mimeType: file.type || 'application/octet-stream',
+    sizeBytes: file.size,
+    type: type as DocumentType,
+    ingestionStatus: 'PENDING',
+    uploadedAt: new Date().toISOString(),
+    uploadedBy: { id: callerId(authorization), fullName: 'Tú (simulado)' },
+    createdMs: Date.now(),
+    content: await file.arrayBuffer(),
+  };
+  store.set(projectId, [doc, ...(store.get(projectId) ?? [])]);
+  return json(201, publicDoc(doc));
 }
 
 export const mockFetch: typeof fetch = async (input, init) => {
-  await new Promise((resolve) => setTimeout(resolve, LATENCY_MS));
   const { pathname } = new URL(String(input));
-  const method = init?.method ?? 'GET';
-  const headers = new Headers(init?.headers);
+  const match = /^\/projects\/([^/]+)\/documents(?:\/([^/]+)\/download)?$/.exec(pathname);
+  if (!match) return fetch(input, init); // not mocked: real network
 
-  if (method === 'POST' && pathname === '/auth/login') return login(init?.body as string);
-  if (method === 'GET' && pathname === '/auth/me') return me(headers.get('Authorization'));
+  await new Promise((resolve) => setTimeout(resolve, LATENCY_MS));
+  const [, projectId, docId] = match;
+  const method = init?.method ?? 'GET';
+  const authorization = new Headers(init?.headers).get('Authorization');
+
+  if (docId && method === 'GET') {
+    const doc = store.get(projectId)?.find((d) => d.id === docId);
+    if (!doc) return json(404, { error: 'Document not found' });
+    return new Response(doc.content, { status: 200, headers: { 'Content-Type': doc.mimeType } });
+  }
+  if (!docId && method === 'GET') return json(200, { data: (store.get(projectId) ?? []).map(publicDoc) });
+  if (!docId && method === 'POST') return upload(projectId, init?.body, authorization);
   return json(404, { error: 'Not found' });
 };

@@ -10,7 +10,7 @@ export interface LoginFailure {
 function retryText(seconds: number | undefined, fallback: string): string {
   if (!seconds) return fallback;
   const minutes = Math.max(1, Math.ceil(seconds / 60));
-  return `Try again in ${minutes} minute${minutes === 1 ? '' : 's'}.`;
+  return `Inténtalo de nuevo en ${minutes} ${minutes === 1 ? 'minuto' : 'minutos'}.`;
 }
 
 /**
@@ -18,32 +18,32 @@ function retryText(seconds: number | undefined, fallback: string): string {
  * "unknown email" and "wrong password" so the UI never reveals whether an account exists.
  */
 export function describeLoginError(err: unknown): LoginFailure {
-  if (!(err instanceof ApiError)) return { form: 'Something went wrong. Please try again.' };
+  if (!(err instanceof ApiError)) return { form: 'Algo salió mal. Inténtalo de nuevo.' };
 
   switch (err.status) {
     case 0:
-      return { form: 'Unable to reach the server. Check your connection and try again.' };
+      return { form: 'No se pudo contactar al servidor. Revisa tu conexión e inténtalo de nuevo.' };
     case 400: {
       const fields: LoginFailure['fields'] = {};
       for (const issue of err.body.details ?? []) {
-        if (issue.path === 'email') fields.email ??= 'Enter a valid email address.';
-        if (issue.path === 'password') fields.password ??= 'Enter your password.';
+        if (issue.path === 'email') fields.email ??= 'Ingresa un correo electrónico válido.';
+        if (issue.path === 'password') fields.password ??= 'Ingresa tu contraseña.';
       }
       return Object.keys(fields).length > 0
         ? { fields }
-        : { form: 'Please check the information you entered.' };
+        : { form: 'Revisa la información que ingresaste.' };
     }
     case 401:
-      return { form: 'Invalid email or password.' };
+      return { form: 'Correo electrónico o contraseña incorrectos.' };
     case 423:
       return {
-        form: `Too many failed attempts: this account is temporarily locked. ${retryText(err.body.retryAfterSeconds, 'Try again later.')}`,
+        form: `Demasiados intentos fallidos: la cuenta está bloqueada temporalmente. ${retryText(err.body.retryAfterSeconds, 'Inténtalo más tarde.')}`,
       };
     case 429:
       return {
-        form: `Too many requests. ${retryText(err.body.retryAfterSeconds, 'Please wait a few minutes and try again.')}`,
+        form: `Demasiadas solicitudes. ${retryText(err.body.retryAfterSeconds, 'Espera unos minutos e inténtalo de nuevo.')}`,
       };
     default:
-      return { form: 'The server had a problem. Please try again in a moment.' };
+      return { form: 'El servidor tuvo un problema. Inténtalo de nuevo en un momento.' };
   }
 }

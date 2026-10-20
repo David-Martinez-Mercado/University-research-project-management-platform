@@ -8,8 +8,8 @@ const EMAIL_PATTERN = /^\S+@\S+\.\S+$/;
 
 function validate(email: string, password: string): NonNullable<LoginFailure['fields']> {
   const fields: NonNullable<LoginFailure['fields']> = {};
-  if (!EMAIL_PATTERN.test(email)) fields.email = 'Enter a valid email address.';
-  if (!password) fields.password = 'Enter your password.';
+  if (!EMAIL_PATTERN.test(email)) fields.email = 'Ingresa un correo electrónico válido.';
+  if (!password) fields.password = 'Ingresa tu contraseña.';
   return fields;
 }
 
@@ -48,14 +48,14 @@ export function LoginPage() {
   return (
     <AppShell>
       <div className="mx-auto w-full max-w-md">
-        <Card title="Sign in" description="Use your university platform account.">
+        <Card title="Iniciar sesión" description="Usa tu cuenta de la plataforma universitaria.">
           <form onSubmit={handleSubmit} noValidate className="space-y-4">
             {sessionExpired && !failure.form && (
-              <Alert tone="info">Your session expired after a period of inactivity. Please sign in again.</Alert>
+              <Alert tone="info">Tu sesión expiró por inactividad. Inicia sesión de nuevo.</Alert>
             )}
             {failure.form && <Alert tone="error">{failure.form}</Alert>}
             <Input
-              label="Email"
+              label="Correo electrónico"
               type="email"
               name="email"
               autoComplete="email"
@@ -65,7 +65,7 @@ export function LoginPage() {
               disabled={submitting}
             />
             <Input
-              label="Password"
+              label="Contraseña"
               type="password"
               name="password"
               autoComplete="current-password"
@@ -75,7 +75,7 @@ export function LoginPage() {
               disabled={submitting}
             />
             <Button type="submit" fullWidth loading={submitting}>
-              {submitting ? 'Signing in...' : 'Sign in'}
+              {submitting ? 'Iniciando sesión...' : 'Iniciar sesión'}
             </Button>
           </form>
         </Card>

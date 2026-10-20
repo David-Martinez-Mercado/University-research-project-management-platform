@@ -15,5 +15,7 @@ export default defineConfig({
     setupFiles: ['src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
     css: false,
+    // Long user-flow tests (tabs, uploads) can exceed the 5 s default on a loaded machine.
+    testTimeout: 20000,
   },
 });

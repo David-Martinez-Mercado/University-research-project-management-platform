@@ -1,60 +1,139 @@
-import { useEffect, useState } from 'react';
-import { getMe } from '../api/auth';
-import type { User } from '../api/types';
+import { useState } from 'react';
+import { listProjects } from '../api/projects';
+import { PROJECT_STATUSES, type ProjectStatus } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
-import { Alert, AppShell, Card } from '../components/ui';
-import { ROLE_LABELS } from '../lib/roles';
+import { StatusBadge } from '../components/badges';
+import { ProjectList } from '../components/ProjectList';
+import { RoleShell } from '../components/RoleShell';
+import { Alert, Button, ButtonLink, Card, EmptyState, Pagination, Select, Spinner } from '../components/ui';
+import { describeError } from '../lib/errors';
+import { STATUS_LABELS } from '../lib/labels';
+import { ROLE_VIEWS } from '../lib/roleViews';
+import { useAsync } from '../lib/useAsync';
 
-const formatDate = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : 'Never');
+const PAGE_SIZE = 10;
 
+/**
+ * One dashboard for every role. GET /projects is already scoped by the backend (admin: all;
+ * researcher/student: own + collaborating; judge: assigned; investor: linked), so this page only
+ * renders what comes back; what differs per role is copy, navigation and the extras in ROLE_VIEWS.
+ */
 export function DashboardPage() {
-  const { user, signOut } = useAuth();
-  // Re-read from GET /auth/me so the role shown is the one the server currently holds.
-  const [profile, setProfile] = useState<User | null>(null);
-  const [failed, setFailed] = useState(false);
+  const { user } = useAuth();
+  const [status, setStatus] = useState<ProjectStatus | ''>('');
+  const [offset, setOffset] = useState(0);
 
-  useEffect(() => {
-    let cancelled = false;
-    getMe().then(
-      (me) => !cancelled && setProfile(me),
-      () => !cancelled && setFailed(true),
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const role = user?.role;
+  const view = role ? ROLE_VIEWS[role] : null;
 
-  const current = profile ?? user;
-  if (!current) return null;
-
-  return (
-    <AppShell user={current} onLogout={signOut}>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-semibold">Welcome, {current.fullName}</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            You are signed in as {ROLE_LABELS[current.role]}.
-          </p>
-        </div>
-        {failed && <Alert tone="error">Could not refresh your account details.</Alert>}
-        <Card title="Your account" description="Details returned by the server for your session.">
-          <dl className="grid gap-4 sm:grid-cols-2">
-            <Detail label="Email" value={current.email} />
-            <Detail label="Role" value={ROLE_LABELS[current.role]} />
-            <Detail label="Affiliation" value={current.affiliation ?? 'Not set'} />
-            <Detail label="Last sign-in"value={formatDate(current.lastLoginAt)} />
-          </dl>
-        </Card>
-      </div>
-    </AppShell>
+  const list = useAsync(
+    () => listProjects({ status: status || undefined, limit: PAGE_SIZE, offset }),
+    [status, offset],
   );
-}
+  const counts = useAsync(async () => {
+    if (!view?.showStatusCounts) return undefined;
+    // No stats endpoint: one cheap query per status (limit=1) and read `total`.
+    const pages = await Promise.all(PROJECT_STATUSES.map((s) => listProjects({ status: s, limit: 1 })));
+    return Object.fromEntries(PROJECT_STATUSES.map((s, i) => [s, pages[i].total])) as Record<ProjectStatus, number>;
+  }, [view?.showStatusCounts]);
 
-function Detail({ label, value }: { label: string; value: string }) {
+  if (!user || !view) return null;
+
+  const page = list.data;
+  const filtered = status !== '';
+
   return (
-    <div>
-      <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</dt>
-      <dd className="mt-0.5 text-sm text-slate-900">{value}</dd>
-    </div>
+    <RoleShell>
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold">{view.dashboardTitle}</h1>
+            <p className="mt-1 text-sm text-slate-600">{view.dashboardIntro}</p>
+          </div>
+          {view.canCreate && (
+            <ButtonLink to="/projects/new">Nuevo proyecto</ButtonLink>
+          )}
+        </div>
+
+        {view.showStatusCounts && (
+          <Card title="Proyectos por estado">
+            {counts.error ? (
+              <Alert tone="error">{describeError(counts.error)}</Alert>
+            ) : !counts.data ? (
+              <Spinner label="Calculando conteos..." />
+            ) : (
+              <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5" aria-label="Conteo por estado">
+                {PROJECT_STATUSES.map((s) => (
+                  <div key={s} className="rounded-md bg-slate-50 px-3 py-2">
+                    <dt className="text-xs text-slate-600">
+                      <StatusBadge status={s} />
+                    </dt>
+                    <dd className="mt-1 text-2xl font-semibold" data-testid={`count-${s}`}>
+                      {counts.data?.[s] ?? 0}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+          </Card>
+        )}
+
+        {view.showStatusCounts && (
+          <div className="max-w-xs">
+            <Select
+              label="Filtrar por estado"
+              value={status}
+              onChange={(e) => {
+                setStatus(e.target.value as ProjectStatus | '');
+                setOffset(0);
+              }}
+            >
+              <option value="">Todos los estados</option>
+              {PROJECT_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {STATUS_LABELS[s]}
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
+
+        <section aria-label="Lista de proyectos" aria-busy={list.loading} className="space-y-4">
+          {list.error ? (
+            <div className="space-y-3">
+              <Alert tone="error">{describeError(list.error)}</Alert>
+              <Button variant="secondary" onClick={list.reload}>
+                Reintentar
+              </Button>
+            </div>
+          ) : !page ? (
+            <Spinner label="Cargando proyectos..." />
+          ) : page.data.length === 0 ? (
+            filtered ? (
+              <EmptyState
+                title="No hay proyectos con ese estado"
+                description="Prueba con otro estado o quita el filtro."
+              />
+            ) : (
+              <EmptyState title={view.emptyTitle} description={view.emptyDescription} />
+            )
+          ) : (
+            <>
+              <p className="sr-only" role="status">
+                {page.total} proyecto{page.total === 1 ? '' : 's'}
+              </p>
+              <ProjectList projects={page.data} currentUserId={user.id} />
+              <Pagination
+                total={page.total}
+                limit={page.limit}
+                offset={page.offset}
+                disabled={list.loading}
+                onChange={setOffset}
+              />
+            </>
+          )}
+        </section>
+      </div>
+    </RoleShell>
   );
 }

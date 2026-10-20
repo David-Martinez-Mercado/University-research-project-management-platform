@@ -9,7 +9,7 @@ export function ProtectedRoute() {
   if (status === 'loading') {
     return (
       <p role="status" className="p-8 text-center text-sm text-slate-500">
-        Restoring your session...
+        Restaurando tu sesión...
       </p>
     );
   }

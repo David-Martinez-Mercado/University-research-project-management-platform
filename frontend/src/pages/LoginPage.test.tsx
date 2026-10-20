@@ -2,22 +2,22 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { tokenStore } from '../auth/tokenStore';
-import { jsonResponse, renderApp, stubFetch, TEST_USER } from '../test/helpers';
+import { jsonResponse, renderApp, stubApi, stubFetch, TEST_USER } from '../test/helpers';
 
 async function submit(email: string, password: string) {
   const user = userEvent.setup();
-  if (email) await user.type(screen.getByLabelText('Email'), email);
-  if (password) await user.type(screen.getByLabelText('Password'), password);
-  await user.click(screen.getByRole('button', { name: 'Sign in' }));
+  if (email) await user.type(screen.getByLabelText('Correo electrónico'), email);
+  if (password) await user.type(screen.getByLabelText('Contraseña'), password);
+  await user.click(screen.getByRole('button', { name: 'Iniciar sesión' }));
 }
 
 describe('LoginPage', () => {
   it('renders the form with labelled fields', () => {
     renderApp('/login');
-    expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Email')).toBeInTheDocument();
-    expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'password');
-    expect(screen.getByRole('button', { name: 'Sign in' })).toBeEnabled();
+    expect(screen.getByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Correo electrónico')).toBeInTheDocument();
+    expect(screen.getByLabelText('Contraseña')).toHaveAttribute('type', 'password');
+    expect(screen.getByRole('button', { name: 'Iniciar sesión' })).toBeEnabled();
   });
 
   it('validates empty and malformed input without calling the API', async () => {
@@ -25,27 +25,27 @@ describe('LoginPage', () => {
     renderApp('/login');
 
     await submit('', '');
-    expect(screen.getByText('Enter a valid email address.')).toBeInTheDocument();
-    expect(screen.getByText('Enter your password.')).toBeInTheDocument();
-    expect(screen.getByLabelText('Email')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText('Ingresa un correo electrónico válido.')).toBeInTheDocument();
+    expect(screen.getByText('Ingresa tu contraseña.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Correo electrónico')).toHaveAttribute('aria-invalid', 'true');
 
-    await userEvent.setup().type(screen.getByLabelText('Email'), 'not-an-email');
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Sign in' }));
-    expect(screen.getByText('Enter a valid email address.')).toBeInTheDocument();
+    await userEvent.setup().type(screen.getByLabelText('Correo electrónico'), 'not-an-email');
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Iniciar sesión' }));
+    expect(screen.getByText('Ingresa un correo electrónico válido.')).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('stores the session and navigates to the dashboard on success', async () => {
-    const fetchMock = stubFetch(
-      jsonResponse(200, { token: 'jwt-1', expiresInSeconds: 1800, user: TEST_USER }),
-      jsonResponse(200, TEST_USER, { 'X-Auth-Token': 'jwt-2' }),
-    );
+    const fetchMock = stubApi({
+      'POST /auth/login': () => jsonResponse(200, { token: 'jwt-1', expiresInSeconds: 1800, user: TEST_USER }),
+      'GET /projects': () =>
+        jsonResponse(200, { data: [], total: 0, limit: 10, offset: 0 }, { 'X-Auth-Token': 'jwt-2' }),
+    });
     renderApp('/login');
 
     await submit('rita@example.edu', 'correct horse battery');
 
-    expect(await screen.findByRole('heading', { name: 'Welcome, Rita Researcher' })).toBeInTheDocument();
-    expect(screen.getByText('You are signed in as Researcher.')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Mis proyectos' })).toBeInTheDocument();
 
     const [url, init] = fetchMock.mock.calls[0];
     expect(String(url)).toMatch(/\/auth\/login$/);
@@ -56,11 +56,11 @@ describe('LoginPage', () => {
     });
     expect(new Headers(init?.headers).has('Authorization')).toBe(false);
 
-    // The dashboard calls GET /auth/me with the stored token, and the refreshed one replaces it.
+    // The dashboard calls GET /projects with the stored token, and the refreshed one replaces it.
     await waitFor(() => expect(tokenStore.get()).toBe('jwt-2'));
-    const [meUrl, meInit] = fetchMock.mock.calls[1];
-    expect(String(meUrl)).toMatch(/\/auth\/me$/);
-    expect(new Headers(meInit?.headers).get('Authorization')).toBe('Bearer jwt-1');
+    const [projectsUrl, projectsInit] = fetchMock.mock.calls[1];
+    expect(String(projectsUrl)).toMatch(/\/projects/);
+    expect(new Headers(projectsInit?.headers).get('Authorization')).toBe('Bearer jwt-1');
   });
 
   it('shows one generic message on 401 and keeps the user on the form', async () => {
@@ -69,9 +69,9 @@ describe('LoginPage', () => {
 
     await submit('nobody@example.edu', 'wrong-password');
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Invalid email or password.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Correo electrónico o contraseña incorrectos.');
     expect(tokenStore.get()).toBeNull();
-    expect(screen.getByRole('button', { name: 'Sign in' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Iniciar sesión' })).toBeEnabled();
   });
 
   it('tells the user how many minutes remain when the account is locked (423)', async () => {
@@ -87,7 +87,7 @@ describe('LoginPage', () => {
     await submit('locked@example.edu', 'whatever');
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'this account is temporarily locked. Try again in 10 minutes.',
+      'la cuenta está bloqueada temporalmente. Inténtalo de nuevo en 10 minutos.',
     );
   });
 
@@ -97,7 +97,7 @@ describe('LoginPage', () => {
 
     await submit('locked@example.edu', 'whatever');
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Try again in 1 minute.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Inténtalo de nuevo en 1 minuto.');
   });
 
   it('shows a rate limit message on 429', async () => {
@@ -106,7 +106,7 @@ describe('LoginPage', () => {
 
     await submit('rita@example.edu', 'whatever');
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Too many requests.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Demasiadas solicitudes.');
   });
 
   it('maps server-side 400 validation details onto fields', async () => {
@@ -120,7 +120,7 @@ describe('LoginPage', () => {
 
     await submit('rita@example.edu', 'whatever');
 
-    expect(await screen.findByText('Enter a valid email address.')).toBeInTheDocument();
+    expect(await screen.findByText('Ingresa un correo electrónico válido.')).toBeInTheDocument();
   });
 
   it('reports an unreachable server', async () => {
@@ -129,6 +129,6 @@ describe('LoginPage', () => {
 
     await submit('rita@example.edu', 'whatever');
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Unable to reach the server');
+    expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo contactar al servidor');
   });
 });
