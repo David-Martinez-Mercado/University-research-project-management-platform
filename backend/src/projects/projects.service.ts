@@ -202,13 +202,27 @@ export async function listCollaborators(projectId: string, user: AuthUser): Prom
 export async function addCollaborator(projectId: string, input: AddCollaboratorInput, user: AuthUser) {
   const { project } = await loadManageableProject(projectId, user);
 
-  if (input.userId === project.ownerId) {
-    throw new HttpError(409, 'The project owner is already the lead and cannot be added as a collaborator');
+  const eligible = (role: string) => (COLLABORATOR_ROLES as readonly string[]).includes(role);
+  let target;
+  if (input.email !== undefined) {
+    target = await prisma.user.findUnique({ where: { email: input.email } });
+    // One generic answer for unknown / inactive / wrong-role, so this endpoint cannot be used to
+    // discover which emails are registered or what role they hold.
+    if (!target || !target.isActive || !eligible(target.role)) {
+      throw new HttpError(404, 'No eligible user found with that email');
+    }
+  } else {
+    if (input.userId === project.ownerId) {
+      throw new HttpError(409, 'The project owner is already the lead and cannot be added as a collaborator');
+    }
+    target = await prisma.user.findUnique({ where: { id: input.userId } });
+    if (!target || !target.isActive) throw new HttpError(404, 'User not found');
+    if (!eligible(target.role)) {
+      throw new HttpError(422, `Only users with role ${COLLABORATOR_ROLES.join(' or ')} can be collaborators`);
+    }
   }
-  const target = await prisma.user.findUnique({ where: { id: input.userId } });
-  if (!target || !target.isActive) throw new HttpError(404, 'User not found');
-  if (!(COLLABORATOR_ROLES as readonly string[]).includes(target.role)) {
-    throw new HttpError(422, `Only users with role ${COLLABORATOR_ROLES.join(' or ')} can be collaborators`);
+  if (target.id === project.ownerId) {
+    throw new HttpError(409, 'The project owner is already the lead and cannot be added as a collaborator');
   }
 
   try {

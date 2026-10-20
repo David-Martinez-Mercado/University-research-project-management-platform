@@ -2,7 +2,7 @@
 
 Implementado por el agente `business-backend`. Código en `backend/src/projects/`, pruebas en `backend/tests/projects.test.ts`.
 
-Alcance de este sprint: **modelo de proyecto + ciclo de vida de estado + CRUD básico + colaboradores**. Documentos, asignación de jueces/COI, evaluaciones, dashboard de inversionistas y notificaciones **siguen abiertos** (ver al final).
+Alcance de este documento: **modelo de proyecto + ciclo de vida de estado + CRUD básico + colaboradores**. Los **documentos** y la **asignación de jueces/COI** se describen en `DOCUMENTS_JUDGING.md` (semana 2). Evaluaciones, dashboard de inversionistas y notificaciones **siguen abiertos** (semana 3).
 
 ## Endpoints
 
@@ -16,7 +16,7 @@ Todos pasan por `authorize(...)` (401 sin token válido, 403 por rol). Ninguno e
 | `PUT /projects/:id` | ADMINISTRATOR, RESEARCHER, STUDENT | Visible (si no, 404) + dueño / LEAD / admin (si no, 403). Solo en `DRAFT` (409 si no); el admin puede editar en cualquier estado. |
 | `PUT /projects/:id/status` | ADMINISTRATOR, RESEARCHER, STUDENT | Visible + dueño/LEAD/admin; luego la tabla de transiciones. |
 | `GET /projects/:id/collaborators` | ADMINISTRATOR, RESEARCHER, STUDENT | Visible (si no, 404). Incluye al dueño como LEAD implícito (`isOwner: true`). |
-| `POST /projects/:id/collaborators` | ADMINISTRATOR, RESEARCHER, STUDENT | Dueño / LEAD / admin. Body `{userId, role?: LEAD\|MEMBER}` (def. MEMBER). |
+| `POST /projects/:id/collaborators` | ADMINISTRATOR, RESEARCHER, STUDENT | Dueño / LEAD / admin. Body: **exactamente uno** de `userId` (UUID) o `email`, más `role?: LEAD\|MEMBER` (def. MEMBER). Con `email` (sin distinguir mayúsculas) un usuario inexistente, inactivo o con rol no elegible da el **mismo 404**, para no revelar qué correos existen. |
 | `DELETE /projects/:id/collaborators/:userId` | ADMINISTRATOR, RESEARCHER, STUDENT | Dueño / LEAD / admin. 204. |
 
 Códigos: 400 validación (zod, `.strict()`: claves desconocidas como `ownerId`/`status` se rechazan), 401 sin/ inválido token, 403 sin permiso sobre un proyecto visible, 404 no visible/inexistente, 409 transición inválida / edición fuera de DRAFT / duplicado, 422 contenido insuficiente para enviar o rol no elegible como colaborador.

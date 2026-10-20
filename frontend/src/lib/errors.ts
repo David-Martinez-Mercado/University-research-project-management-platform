@@ -60,9 +60,10 @@ export function describeError(err: unknown, context: ErrorContext = 'load'): str
       if (status === 403) return 'Tu rol no puede crear proyectos.';
       break;
     case 'collaborator-add':
-      if (status === 400) return 'Revisa el identificador de usuario y el rol.';
+      if (status === 400) return 'Revisa el correo y el rol.';
       if (status === 403) return 'No tienes permiso para agregar colaboradores a este proyecto.';
-      if (status === 404) return 'No existe un usuario activo con ese identificador.';
+      // The server answers identically for unknown, inactive and wrong-role emails (no enumeration).
+      if (status === 404) return 'No se encontró un usuario elegible con ese correo. Debe ser un Investigador o Estudiante activo.';
       if (status === 409) return 'Ese usuario ya es colaborador del proyecto (o es el dueño, que ya es líder).';
       if (status === 422) return 'Solo usuarios con rol Investigador o Estudiante pueden ser colaboradores.';
       break;

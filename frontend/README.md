@@ -140,10 +140,11 @@ strategy can change in one place.
 
 - The backend answers 423 only for existing accounts, so a locked-account message can confirm that an email exists (a backend
   design property).
-- **Adding a collaborator needs a user UUID** (`POST /projects/:id/collaborators` takes `{userId, role}`) and there is no
-  user-search/list endpoint for non-admins, so the form asks for the UUID with a hint. A usable flow needs e.g. lookup by email.
+- Collaborators are added **by email** (`POST /projects/:id/collaborators` takes `{email, role}`; the backend also still accepts
+  `{userId, role}`). For unknown, inactive or wrong-role emails the backend answers the same generic 404, so the form shows one
+  message for all three (this avoids revealing which emails are registered).
 - `GET /projects/:id` has no `canManage`/`myRole` field, so the UI infers it (owner id, administrator, or LEAD in the
   collaborators list). Judges/investors cannot read collaborators (403), which is why they never see the owner's name.
 - The project list/detail has no owner name (only `ownerId`); the owner name shown in Vista general comes from the collaborators list.
 - No stats endpoint: the admin counts per status use one `GET /projects?status=X&limit=1` per status and read `total`.
-- `docs/PROJECTS.md` still says documents are open; the documents module is now in the backend and is used for real.
+- Documents are served by the real backend (`docs/DOCUMENTS_JUDGING.md`); the simulated documents API only runs with `VITE_USE_MOCKS=true`.

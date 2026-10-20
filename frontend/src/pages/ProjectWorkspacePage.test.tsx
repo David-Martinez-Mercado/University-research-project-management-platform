@@ -271,31 +271,31 @@ describe('project workspace: collaborators', () => {
     expect(within(items[1]).getByText(/sam@example.edu/)).toBeInTheDocument();
   });
 
-  it('adds a collaborator by userId (validating the UUID first) and refreshes the list', async () => {
+  it('adds a collaborator by email (validating the email first) and refreshes the list', async () => {
     const fetchMock = open(owner, draft, [ownerRow], {
       [`POST ${base}/collaborators`]: () => jsonResponse(201, { data: [ownerRow, otherRow] }),
     }, '?tab=collaborators');
     const user = userEvent.setup();
 
-    await user.type(await screen.findByLabelText('Identificador del usuario (UUID)'), 'not-a-uuid');
+    await user.type(await screen.findByLabelText('Correo del colaborador'), 'not-an-email');
     await user.click(screen.getByRole('button', { name: 'Agregar colaborador' }));
-    expect(screen.getByText('Ingresa un identificador de usuario válido (UUID).')).toBeInTheDocument();
+    expect(screen.getByText('Ingresa un correo electrónico válido.')).toBeInTheDocument();
     expect(callsTo(fetchMock, `POST ${base}/collaborators`)).toHaveLength(0);
 
-    const input = screen.getByLabelText('Identificador del usuario (UUID)');
+    const input = screen.getByLabelText('Correo del colaborador');
     await user.clear(input);
-    await user.type(input, other);
+    await user.type(input, 'sam@example.edu');
     await user.selectOptions(screen.getByLabelText('Rol en el proyecto'), 'LEAD');
     await user.click(screen.getByRole('button', { name: 'Agregar colaborador' }));
 
     expect(await screen.findByText('Sam Student')).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('Colaborador agregado.');
     const [, init] = callsTo(fetchMock, `POST ${base}/collaborators`)[0];
-    expect(JSON.parse(String(init?.body))).toEqual({ userId: other, role: 'LEAD' });
+    expect(JSON.parse(String(init?.body))).toEqual({ email: 'sam@example.edu', role: 'LEAD' });
   });
 
   it.each([
-    [404, 'No existe un usuario activo con ese identificador.'],
+    [404, 'No se encontró un usuario elegible con ese correo.'],
     [409, 'Ese usuario ya es colaborador del proyecto'],
     [422, 'Solo usuarios con rol Investigador o Estudiante pueden ser colaboradores.'],
     [403, 'No tienes permiso para agregar colaboradores a este proyecto.'],
@@ -303,7 +303,7 @@ describe('project workspace: collaborators', () => {
     open(owner, draft, [ownerRow], { [`POST ${base}/collaborators`]: () => jsonResponse(status, { error: 'x' }) }, '?tab=collaborators');
     const user = userEvent.setup();
 
-    await user.type(await screen.findByLabelText('Identificador del usuario (UUID)'), other);
+    await user.type(await screen.findByLabelText('Correo del colaborador'), 'sam@example.edu');
     await user.click(screen.getByRole('button', { name: 'Agregar colaborador' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(message);
@@ -338,7 +338,7 @@ describe('project workspace: collaborators', () => {
     open(student, draft, [ownerRow, otherRow], {}, '?tab=collaborators');
 
     expect(await screen.findByText('Sam Student')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Identificador del usuario (UUID)')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Correo del colaborador')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Quitar/ })).not.toBeInTheDocument();
   });
 

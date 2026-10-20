@@ -40,10 +40,10 @@ export const listCollaborators = (projectId: string) =>
   apiRequest<{ data: Collaborator[] }>(`/projects/${projectId}/collaborators`).then((r) => r.data);
 
 /** Returns the full, updated collaborator list. */
-export const addCollaborator = (projectId: string, userId: string, role: CollaboratorRole) =>
+export const addCollaborator = (projectId: string, email: string, role: CollaboratorRole) =>
   apiRequest<{ data: Collaborator[] }>(`/projects/${projectId}/collaborators`, {
     method: 'POST',
-    body: { userId, role },
+    body: { email, role },
   }).then((r) => r.data);
 
 export const removeCollaborator = (projectId: string, userId: string) =>

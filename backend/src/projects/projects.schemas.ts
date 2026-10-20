@@ -48,12 +48,20 @@ export const listProjectsQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).max(1_000_000).default(0),
 });
 
+// Exactly one of `userId` / `email`. Looking a user up by email lets project managers add
+// collaborators without knowing UUIDs (there is no user directory for non-admins).
+// Defined here (not imported from users.schemas) to avoid a circular import.
 export const addCollaboratorSchema = z
   .object({
-    userId: z.string().uuid(),
+    userId: z.string().uuid().optional(),
+    email: z.string().trim().toLowerCase().email().max(254).optional(),
     role: z.nativeEnum(CollaboratorRole).default('MEMBER'),
   })
-  .strict();
+  .strict()
+  .refine((v) => (v.userId === undefined) !== (v.email === undefined), {
+    message: 'Provide exactly one of userId or email',
+    path: ['userId'],
+  });
 
 export const projectIdParamSchema = z.object({ id: z.string().uuid() });
 export const collaboratorParamsSchema = z.object({ id: z.string().uuid(), userId: z.string().uuid() });

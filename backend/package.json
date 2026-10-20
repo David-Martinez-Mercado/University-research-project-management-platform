@@ -12,7 +12,8 @@
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
     "db:generate": "prisma generate",
-    "db:smoke": "tsx scripts/db-smoke-test.ts"
+    "db:smoke": "tsx scripts/db-smoke-test.ts",
+    "test:files": "node scripts/run-tests-by-file.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

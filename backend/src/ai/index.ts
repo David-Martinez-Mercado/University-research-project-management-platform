@@ -1,4 +1,5 @@
 import { env } from '../config/env';
+import { prisma } from '../db/prisma';
 import { DOCUMENT_UPLOADED, documentEvents, type DocumentUploadedEvent } from '../documents/documents.events';
 import { ingestDocument } from './ingestion';
 import { aiLog } from './log';
@@ -39,6 +40,38 @@ export function registerAiListeners(): () => void {
     documentEvents.on(DOCUMENT_UPLOADED, listener);
   }
   return unregisterAiListeners;
+}
+
+/**
+ * Ingestion runs in-process, so a restart (or crash) mid-ingestion would leave documents stuck in
+ * PENDING/PROCESSING forever. Call this once at startup to re-run them. Sequential on purpose (bounded
+ * load on the embedding provider); ingestion is idempotent, so re-running a half-done document is safe.
+ * Returns how many documents it attempted. Never throws.
+ */
+export async function recoverPendingIngestions(limit = 200): Promise<number> {
+  let ids: { id: string }[];
+  try {
+    ids = await prisma.document.findMany({
+      where: { ingestionStatus: { in: ['PENDING', 'PROCESSING'] } },
+      select: { id: true },
+      orderBy: { uploadedAt: 'asc' },
+      take: limit,
+    });
+  } catch (err) {
+    aiLog.error('could not list documents pending ingestion', { reason: (err as Error)?.name });
+    return 0;
+  }
+  if (ids.length > 0) aiLog.info('recovering documents left unindexed', { count: ids.length });
+  for (const { id } of ids) {
+    const task = ingestDocument(id)
+      .catch((err: unknown) => {
+        aiLog.error('unexpected ingestion crash during recovery', { documentId: id, reason: (err as Error)?.name });
+      })
+      .finally(() => inFlight.delete(task));
+    inFlight.add(task);
+    await task;
+  }
+  return ids.length;
 }
 
 export function unregisterAiListeners(): void {

@@ -7,12 +7,13 @@ import { ROLE_LABELS } from '../../lib/roles';
 import { Alert, Badge, Button, Card, EmptyState, Input, Select, Spinner } from '../ui';
 import type { WorkspaceContext } from './types';
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Light client-side check; the server is the authority.
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function CollaboratorsTab({ project, canManage, userId, collaborators }: WorkspaceContext) {
-  const [newUserId, setNewUserId] = useState('');
+  const [newEmail, setNewEmail] = useState('');
   const [newRole, setNewRole] = useState<CollaboratorRole>('MEMBER');
-  const [idError, setIdError] = useState<string | undefined>();
+  const [emailError, setEmailError] = useState<string | undefined>();
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -27,22 +28,22 @@ export function CollaboratorsTab({ project, canManage, userId, collaborators }: 
     event.preventDefault();
     setNotice(null);
     setAddError(null);
-    const value = newUserId.trim();
-    if (!UUID_PATTERN.test(value)) {
-      setIdError('Ingresa un identificador de usuario válido (UUID).');
+    const value = newEmail.trim();
+    if (!EMAIL_PATTERN.test(value)) {
+      setEmailError('Ingresa un correo electrónico válido.');
       return;
     }
-    setIdError(undefined);
+    setEmailError(undefined);
     setAdding(true);
     try {
       // The backend returns the full, updated list.
       const updated = await addCollaborator(project.id, value, newRole);
       setData(updated);
-      setNewUserId('');
+      setNewEmail('');
       setNotice('Colaborador agregado.');
     } catch (err) {
       const fields = fieldErrorsFrom(err);
-      if (fields.userId) setIdError(fields.userId);
+      if (fields.email) setEmailError(fields.email);
       setAddError(describeError(err, 'collaborator-add'));
     } finally {
       setAdding(false);
@@ -77,11 +78,12 @@ export function CollaboratorsTab({ project, canManage, userId, collaborators }: 
             {notice && <Alert tone="success">{notice}</Alert>}
             <div className="grid gap-4 sm:grid-cols-[1fr_12rem]">
               <Input
-                label="Identificador del usuario (UUID)"
-                value={newUserId}
-                onChange={(e) => setNewUserId(e.target.value)}
-                error={idError}
-                hint="Aún no hay búsqueda de usuarios: pide el identificador a un administrador."
+                label="Correo del colaborador"
+                type="email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                error={emailError}
+                hint="El correo con el que la persona inició sesión en la plataforma."
                 autoComplete="off"
                 spellCheck={false}
                 disabled={adding}

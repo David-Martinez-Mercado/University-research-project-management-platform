@@ -482,6 +482,70 @@ describe('collaborators', () => {
     expect(await prisma.projectCollaborator.count({ where: { projectId: p.id } })).toBe(1);
   });
 
+  describe('adding by email', () => {
+    it('adds an eligible user by email (case-insensitive) and returns the updated list', async () => {
+      const owner = await as('RESEARCHER');
+      // The API always stores emails lowercased; the request may use any case / surrounding spaces.
+      const student = await makeUser('STUDENT', { email: 'ana.student@test.local' });
+      const p = await mkProject(owner.user.id);
+      const res = await api()
+        .post(`/projects/${p.id}/collaborators`)
+        .set(owner.h)
+        .send({ email: '  ANA.student@test.LOCAL ', role: 'LEAD' });
+      expect(res.status).toBe(201);
+      const added = res.body.data.find((c: { userId: string }) => c.userId === student.id);
+      expect(added).toMatchObject({ role: 'LEAD', isOwner: false });
+      expect(await prisma.projectCollaborator.count({ where: { projectId: p.id } })).toBe(1);
+    });
+
+    it('answers unknown, inactive and non-collaborator-role emails identically (404, no enumeration)', async () => {
+      const owner = await as('RESEARCHER');
+      const p = await mkProject(owner.user.id);
+      const judge = await makeUser('JUDGE');
+      const inactive = await makeUser('STUDENT', { isActive: false });
+      const admin = await makeUser('ADMINISTRATOR');
+      const bodies = [judge.email, inactive.email, admin.email, 'nobody@test.local'].map((email) =>
+        api().post(`/projects/${p.id}/collaborators`).set(owner.h).send({ email }),
+      );
+      const results = await Promise.all(bodies);
+      for (const r of results) expect(r.status).toBe(404);
+      expect(new Set(results.map((r) => JSON.stringify(r.body))).size).toBe(1);
+      expect(await prisma.projectCollaborator.count({ where: { projectId: p.id } })).toBe(0);
+    });
+
+    it('rejects the owner (409) and duplicates (409) by email too', async () => {
+      const owner = await as('RESEARCHER');
+      const s = await makeUser('STUDENT');
+      const p = await mkProject(owner.user.id);
+      const add = (email: string) => api().post(`/projects/${p.id}/collaborators`).set(owner.h).send({ email });
+      expect((await add(owner.user.email)).status).toBe(409);
+      expect((await add(s.email)).status).toBe(201);
+      expect((await add(s.email)).status).toBe(409);
+    });
+
+    it('requires exactly one of userId / email, and a valid email (400)', async () => {
+      const owner = await as('RESEARCHER');
+      const s = await makeUser('STUDENT');
+      const p = await mkProject(owner.user.id);
+      for (const body of [{ userId: s.id, email: s.email }, { email: 'not-an-email' }, { email: '' }]) {
+        expect((await api().post(`/projects/${p.id}/collaborators`).set(owner.h).send(body)).status).toBe(400);
+      }
+    });
+
+    it('keeps the existing permission rules: a plain collaborator or stranger cannot add by email', async () => {
+      const owner = await as('RESEARCHER');
+      const member = await as('STUDENT');
+      const stranger = await as('RESEARCHER');
+      const target = await makeUser('STUDENT');
+      const p = await mkProject(owner.user.id);
+      await api().post(`/projects/${p.id}/collaborators`).set(owner.h).send({ userId: member.user.id });
+      const byMember = await api().post(`/projects/${p.id}/collaborators`).set(member.h).send({ email: target.email });
+      expect(byMember.status).toBe(403);
+      const byStranger = await api().post(`/projects/${p.id}/collaborators`).set(stranger.h).send({ email: target.email });
+      expect(byStranger.status).toBe(404);
+    });
+  });
+
   it('validates the body (400)', async () => {
     const owner = await as('RESEARCHER');
     const s = await makeUser('STUDENT');

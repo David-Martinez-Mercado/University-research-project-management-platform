@@ -1,4 +1,4 @@
-import { registerAiListeners } from './ai';
+import { recoverPendingIngestions, registerAiListeners } from './ai';
 import { app } from './app';
 import { env } from './config/env';
 import { prisma } from './db/prisma';
@@ -9,6 +9,9 @@ registerAiListeners();
 const server = app.listen(env.PORT, () => {
   console.log(`API listening on port ${env.PORT} (${env.NODE_ENV})`);
 });
+
+// Re-run documents a previous process left unindexed (background; never blocks startup).
+void recoverPendingIngestions();
 
 const shutdown = () => {
   server.close(() => {
