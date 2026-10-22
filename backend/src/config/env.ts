@@ -34,6 +34,16 @@ const schema = z
     EMBEDDING_MODEL: z.string().min(1).default('text-embedding-3-small'),
     EMBEDDING_BATCH_SIZE: z.coerce.number().int().min(1).max(2048).default(64),
     EMBEDDING_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
+    // AI assistant answers (FR-007). `mock` builds an extractive answer from the retrieved passages (dev/test only).
+    LLM_PROVIDER: z.enum(['mock', 'openai']).default('mock'),
+    LLM_API_KEY: optionalString,
+    LLM_API_URL: z.string().url().default('https://api.openai.com/v1/chat/completions'),
+    LLM_MODEL: z.string().min(1).default('gpt-4o-mini'),
+    // FR-028: the assistant must answer or fall back within 10 s.
+    LLM_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
+    // AIR-004: below this best-chunk cosine similarity the assistant refuses instead of answering.
+    AI_MIN_SIMILARITY: z.coerce.number().min(0).max(1).default(0.15),
+    AI_TOP_K: z.coerce.number().int().min(1).max(20).default(5),
     RATE_LIMIT_ENABLED: z
       .enum(['true', 'false'])
       .default('true')
@@ -45,6 +55,13 @@ const schema = z
         code: z.ZodIssueCode.custom,
         path: ['EMBEDDING_API_KEY'],
         message: 'EMBEDDING_API_KEY is required when EMBEDDING_PROVIDER=openai',
+      });
+    }
+    if (cfg.LLM_PROVIDER === 'openai' && !cfg.LLM_API_KEY) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['LLM_API_KEY'],
+        message: 'LLM_API_KEY is required when LLM_PROVIDER=openai',
       });
     }
     if (cfg.NODE_ENV === 'production' && !cfg.BOOTSTRAP_OWNER_SECRET) {

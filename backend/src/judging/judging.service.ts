@@ -2,6 +2,7 @@ import { Prisma, type ProjectStatus } from '@prisma/client';
 import { prisma } from '../db/prisma';
 import { HttpError } from '../errors';
 import type { AuthUser } from '../middleware/authenticate';
+import { notifyUsers } from '../notifications/notifications.service';
 import { toPublicProject } from '../projects/projects.service';
 import { visibleProjectsWhere } from '../projects/projects.scope';
 import { evaluateConflictOfInterest } from './judging.coi';
@@ -98,6 +99,12 @@ export async function createAssignment(input: CreateAssignmentInput, admin: Auth
         data: { projectId: project.id, judgeId: judge.id, assignedById: admin.id },
         include: assignmentInclude,
       });
+    });
+    await notifyUsers([row.judgeId], {
+      projectId: row.projectId,
+      type: 'JUDGE_ASSIGNED',
+      title: 'Nuevo proyecto asignado',
+      message: `Se te asignó «${row.project.title}» para evaluar.`,
     });
     return toPublicAssignment(row);
   } catch (err) {

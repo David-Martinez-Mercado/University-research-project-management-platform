@@ -11,7 +11,7 @@ export interface CardProps {
 
 export function Card({ title, description, footer, className, children }: CardProps) {
   return (
-    <section className={cx('rounded-lg border border-slate-200 bg-white shadow-sm', className)}>
+    <section className={cx('rounded-xl border border-slate-200 bg-white shadow-sm', className)}>
       {(title || description) && (
         <header className="border-b border-slate-100 px-5 py-4 sm:px-6">
           {title && <h2 className="text-base font-semibold text-slate-900">{title}</h2>}
@@ -20,7 +20,7 @@ export function Card({ title, description, footer, className, children }: CardPr
       )}
       {children && <div className="px-5 py-4 sm:px-6">{children}</div>}
       {footer && (
-        <footer className="rounded-b-lg border-t border-slate-100 bg-slate-50 px-5 py-3 sm:px-6">
+        <footer className="rounded-b-xl border-t border-slate-100 bg-slate-50 px-5 py-3 sm:px-6">
           {footer}
         </footer>
       )}

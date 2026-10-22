@@ -1,5 +1,7 @@
 export { Alert } from './Alert';
-export { AppShell, APP_NAME } from './AppShell';
+export { AppShell, BrandMark, APP_NAME } from './AppShell';
+export { Icon } from './Icon';
+export type { IconName } from './Icon';
 export type { AppShellProps, AppShellNavItem } from './AppShell';
 export { Badge } from './Badge';
 export type { BadgeTone } from './Badge';
@@ -22,3 +24,6 @@ export { Tabs } from './Tabs';
 export type { TabItem, TabsProps } from './Tabs';
 export { Textarea } from './Textarea';
 export type { TextareaProps } from './Textarea';
+export { PageHeader } from './PageHeader';
+export type { PageHeaderProps } from './PageHeader';
+export { ProgressBar } from './ProgressBar';

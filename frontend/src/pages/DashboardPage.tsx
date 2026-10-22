@@ -5,7 +5,7 @@ import { useAuth } from '../auth/AuthContext';
 import { StatusBadge } from '../components/badges';
 import { ProjectList } from '../components/ProjectList';
 import { RoleShell } from '../components/RoleShell';
-import { Alert, Button, ButtonLink, Card, EmptyState, Pagination, Select, Spinner } from '../components/ui';
+import { Alert, Button, ButtonLink, Card, EmptyState, PageHeader, Pagination, Select, Spinner } from '../components/ui';
 import { describeError } from '../lib/errors';
 import { STATUS_LABELS } from '../lib/labels';
 import { ROLE_VIEWS } from '../lib/roleViews';
@@ -45,15 +45,11 @@ export function DashboardPage() {
   return (
     <RoleShell>
       <div className="space-y-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold">{view.dashboardTitle}</h1>
-            <p className="mt-1 text-sm text-slate-600">{view.dashboardIntro}</p>
-          </div>
-          {view.canCreate && (
-            <ButtonLink to="/projects/new">Nuevo proyecto</ButtonLink>
-          )}
-        </div>
+        <PageHeader
+          title={view.dashboardTitle}
+          description={`Hola, ${user.fullName.split(' ')[0]}. ${view.dashboardIntro}`}
+          actions={view.canCreate && <ButtonLink to="/projects/new">Nuevo proyecto</ButtonLink>}
+        />
 
         {view.showStatusCounts && (
           <Card title="Proyectos por estado">
@@ -64,11 +60,11 @@ export function DashboardPage() {
             ) : (
               <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5" aria-label="Conteo por estado">
                 {PROJECT_STATUSES.map((s) => (
-                  <div key={s} className="rounded-md bg-slate-50 px-3 py-2">
+                  <div key={s} className="rounded-xl border border-slate-100 bg-gradient-to-br from-brand-50 to-white px-3 py-3">
                     <dt className="text-xs text-slate-600">
                       <StatusBadge status={s} />
                     </dt>
-                    <dd className="mt-1 text-2xl font-semibold" data-testid={`count-${s}`}>
+                    <dd className="mt-1 text-3xl font-bold text-brand-700" data-testid={`count-${s}`}>
                       {counts.data?.[s] ?? 0}
                     </dd>
                   </div>

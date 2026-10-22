@@ -8,21 +8,30 @@ import { Alert, Button, Spinner, Tabs, type TabItem } from '../components/ui';
 import { CollaboratorsTab } from '../components/workspace/CollaboratorsTab';
 import { DocumentsTab } from '../components/workspace/DocumentsTab';
 import { OverviewTab } from '../components/workspace/OverviewTab';
-import { PlaceholderTab } from '../components/workspace/PlaceholderTab';
+import { AiTab } from '../components/workspace/AiTab';
+import { EvaluationTab } from '../components/workspace/EvaluationTab';
+import { ProgressTab } from '../components/workspace/ProgressTab';
+import { ResultsTab } from '../components/workspace/ResultsTab';
+import { RubricTab } from '../components/workspace/RubricTab';
 import type { WorkspaceContext } from '../components/workspace/types';
 import type { Project, Role } from '../api/types';
 import { describeError } from '../lib/errors';
 import { PROJECT_TEAM_ROLES } from '../lib/roles';
 import { useAsync } from '../lib/useAsync';
 
-type TabId = 'overview' | 'documents' | 'collaborators' | 'ai' | 'progress';
+type TabId = 'overview' | 'documents' | 'collaborators' | 'rubric' | 'evaluation' | 'ai' | 'progress' | 'results';
 
 /** Tabs a role may open. INVESTOR has no Documents tab; JUDGE/INVESTOR cannot read collaborators. */
 export function tabsForRole(role: Role): TabItem[] {
   const tabs: Array<TabItem & { id: TabId }> = [{ id: 'overview', label: 'Vista general' }];
   if (role !== 'INVESTOR') tabs.push({ id: 'documents', label: 'Documentos' });
   if (PROJECT_TEAM_ROLES.includes(role)) tabs.push({ id: 'collaborators', label: 'Colaboradores' });
-  tabs.push({ id: 'ai', label: 'Asistente IA' }, { id: 'progress', label: 'Progreso' });
+  // The rubric endpoint is 403 for INVESTOR, like the documents one.
+  if (role !== 'INVESTOR') tabs.push({ id: 'rubric', label: 'Rúbrica' });
+  if (role === 'JUDGE') tabs.push({ id: 'evaluation', label: 'Mi evaluación' });
+  // Investors never reach project documents (BR-007), so the assistant is not offered to them.
+  if (role !== 'INVESTOR') tabs.push({ id: 'ai', label: 'Asistente IA' });
+  tabs.push({ id: 'progress', label: 'Progreso' }, { id: 'results', label: 'Resultados' });
   return tabs;
 }
 
@@ -99,12 +108,11 @@ export function ProjectWorkspacePage() {
           {selected === 'overview' && <OverviewTab {...ctx} />}
           {selected === 'documents' && <DocumentsTab {...ctx} />}
           {selected === 'collaborators' && <CollaboratorsTab {...ctx} />}
-          {selected === 'ai' && (
-            <PlaceholderTab name="Asistente IA" description="Aquí podrás hacer preguntas sobre los documentos del proyecto." />
-          )}
-          {selected === 'progress' && (
-            <PlaceholderTab name="Progreso" description="Aquí verás el avance y los hitos del proyecto." />
-          )}
+          {selected === 'rubric' && <RubricTab {...ctx} />}
+          {selected === 'evaluation' && <EvaluationTab {...ctx} />}
+          {selected === 'ai' && <AiTab {...ctx} />}
+          {selected === 'progress' && <ProgressTab {...ctx} />}
+          {selected === 'results' && <ResultsTab {...ctx} />}
         </Tabs>
       </div>
     );

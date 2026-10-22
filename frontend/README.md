@@ -6,14 +6,17 @@ React 19 + TypeScript + Tailwind CSS 4 on Vite 8. Tests with Vitest + Testing Li
 
 | Screen | State |
 |---|---|
-| 1. Login (`/login`, real `POST /auth/login`) | done |
-| 2. Dashboard adapted per role (`/`, real `GET /projects`) | done (admin, researcher, student, judge, investor) |
-| 2b. Create project (`/projects/new`, real `POST /projects`) | done |
-| 3. Project workspace (`/projects/:id`): Vista general, Documentos, Colaboradores | done |
-| 3b. Workspace tabs "Asistente IA" and "Progreso" | placeholder ("disponible en una semana posterior", scheduled for week 4; no fake data) |
-| 4. Evaluation (Judge) | open (week 3) |
-| 5. Investor dashboard (reports, `/investors/:id/dashboard`) | open (week 3). Investors currently get the generic linked-projects list from `GET /projects`. |
-| 6. Admin panel (users, criteria, assignments) | open (week 4) |
+| Login (split layout, `POST /auth/login`) | done |
+| Dashboard per role (`GET /projects`; investors get their own dashboard) | done |
+| Create project, project workspace (Vista general, Documentos, Colaboradores, Rúbrica) | done |
+| Workspace "Mi evaluación" (judge: draft recovery, confirmation before final submit) | done |
+| Workspace "Asistente IA" (AI-generated label, sources, "Reportar respuesta incorrecta", fallback, outage message) | done |
+| Workspace "Progreso" (milestones + progress bar, locked once under evaluation) | done |
+| Workspace "Resultados" (hidden until the evaluation closes; PDF report for investor/judge/admin) | done |
+| Investor dashboard (`/investors/:id/dashboard`: status/area/date filters, PDF export) | done |
+| Notifications (`/notifications`, unread counter in the sidebar, polled every 60 s) | done |
+| Admin: Usuarios, Criterios, Asignación de jueces, Inversionistas, Actividad de IA | done |
+| Visual identity (UNIPOLI purple/orange/green, sidebar shell, responsive) | done |
 
 ## Run
 

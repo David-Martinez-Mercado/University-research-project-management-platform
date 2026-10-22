@@ -83,15 +83,45 @@ describe('role dashboards', () => {
     expect(await screen.findByText('Aún no hay proyectos asignados')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Nuevo proyecto' })).not.toBeInTheDocument();
     const nav = screen.getByRole('navigation', { name: 'Principal' });
-    expect(within(nav).getAllByRole('link')).toHaveLength(1);
+    expect(within(nav).getAllByRole('link').map((l) => l.textContent?.replace(/\d+ sin leer/, '').trim())).toEqual(['Proyectos asignados', 'Notificaciones']);
   });
 
-  it('INVESTOR: linked projects, read-only, with its own empty message', async () => {
-    signedInAs(makeUser('INVESTOR'), { 'GET /projects': () => jsonResponse(200, page([])) });
+  it('INVESTOR: own read-only dashboard with the linked projects, no create action', async () => {
+    const investor = makeUser('INVESTOR');
+    signedInAs(investor, {
+      [`GET /investors/${investor.id}/dashboard`]: () =>
+        jsonResponse(200, {
+          investorId: investor.id,
+          summary: { totalLinked: 1, byStatus: { UNDER_EVALUATION: 1 }, researchAreas: ['Veterinaria'] },
+          data: [
+            {
+              id: 'p1',
+              title: 'Monitoreo de ganado',
+              summary: 'Sensores',
+              researchArea: 'Veterinaria',
+              status: 'UNDER_EVALUATION',
+              ownerName: 'Rosa',
+              createdAt: '2026-10-01T10:00:00.000Z',
+              updatedAt: '2026-10-02T10:00:00.000Z',
+              progressPercent: 50,
+              milestones: [],
+              evaluation: { judgesAssigned: 2, judgesCompleted: 1, closed: false, overallPercent: null },
+            },
+          ],
+          total: 1,
+          limit: 6,
+          offset: 0,
+        }),
+    });
     renderApp('/');
 
     expect(await screen.findByRole('heading', { name: 'Proyectos vinculados' })).toBeInTheDocument();
-    expect(await screen.findByText('Aún no hay proyectos vinculados')).toBeInTheDocument();
+    expect(await screen.findByText('Monitoreo de ganado')).toBeInTheDocument();
+    expect(screen.getByTestId('total-linked')).toHaveTextContent('1');
+    expect(screen.getByTestId('inv-count-UNDER_EVALUATION')).toHaveTextContent('1');
+    expect(screen.getByText('Evaluación: 1/2 jueces')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar', { name: 'Avance' })).toHaveAttribute('aria-valuenow', '50');
+    expect(screen.getByRole('button', { name: 'Exportar PDF' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Nuevo proyecto' })).not.toBeInTheDocument();
   });
 

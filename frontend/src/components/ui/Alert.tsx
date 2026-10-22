@@ -13,7 +13,7 @@ export function Alert({ tone = 'info', children }: { tone?: Tone; children: Reac
   return (
     <div
       role={tone === 'error' ? 'alert' : 'status'}
-      className={cx('rounded-md border px-3 py-2.5 text-sm', TONES[tone])}
+      className={cx('rounded-lg border px-3.5 py-3 text-sm', TONES[tone])}
     >
       {children}
     </div>

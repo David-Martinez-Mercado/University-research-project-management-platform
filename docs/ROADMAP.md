@@ -128,3 +128,14 @@
 - Las fechas de Notion son estimadas; si la fecha real de entrega del curso cambia, se recorren las semanas 7–8.
 - IA/RAG necesita una API de embeddings y otra de LLM. Hasta contar con las llaves, el pipeline se construye con una interfaz de proveedor y un proveedor simulado para pruebas.
 - Los archivos subidos se guardan hoy en disco local (interfaz `FileStorage`). El disco de un Web Service de Render es efímero: antes de desplegar hay que pasar a un disco persistente o a almacenamiento de objetos.
+
+
+---
+
+## Cierre anticipado de las semanas 3 y 4 (22 oct)
+
+Implementado en backend y frontend: evaluaciones con borrador (`POST /evaluations`, `GET /projects/:id/evaluation`, `GET /projects/:id/results`), vínculos y dashboard de inversionista, reporte PDF, hitos/progreso (`/projects/:id/milestones`), notificaciones in-app, asistente de IA (`POST /projects/:id/ask`, historial, reporte de respuesta incorrecta, bitácora para el administrador) y sus pantallas. Migración `20261022150000_milestones_ai_feedback`.
+
+Reglas decididas: el juez solo califica con el proyecto `UNDER_EVALUATION` (lo inicia un admin); cuando el último juez envía, el proyecto pasa solo a `EVALUATED` y ahí se publican los resultados (BR-003); los comentarios son anónimos salvo para el admin.
+
+**Pendiente / limitaciones:** `LLM_PROVIDER=mock` y embeddings simulados (sin llave de proveedor, el asistente solo cita fragmentos); umbral `AI_MIN_SIMILARITY` sin afinar con el conjunto de prueba (AIR-001/004); retención de 12 meses de la bitácora (AIR-008) sin tarea programada; correo electrónico de notificaciones no implementado (solo in-app); sin revisión manual con lector de pantalla ni teléfono real.

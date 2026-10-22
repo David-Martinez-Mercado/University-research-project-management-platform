@@ -1,9 +1,45 @@
 @import 'tailwindcss';
 
+/*
+ * Identidad UNIPOLI: morado (acción principal), naranja (acento) y verde (éxito).
+ * Los tonos de texto sobre blanco cumplen WCAG 2.1 AA (>= 4.5:1).
+ */
 @theme {
-  --color-brand-50: #eef4ff;
-  --color-brand-100: #dbe6ff;
-  --color-brand-500: #3b63e6;
-  --color-brand-600: #284ccb;
-  --color-brand-700: #223ea3;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  --color-brand-50: #f6effb;
+  --color-brand-100: #ead9f5;
+  --color-brand-200: #d7b6ea;
+  --color-brand-500: #8b3fb8;
+  --color-brand-600: #6d2a96;
+  --color-brand-700: #571f78;
+  --color-brand-900: #2e1042;
+
+  --color-accent-50: #fff4e5;
+  --color-accent-100: #ffe3bd;
+  --color-accent-500: #f28c1e;
+  --color-accent-700: #a64d00;
+
+  --color-lime-brand: #8dc63f;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -9,7 +9,16 @@ export type ErrorContext =
   | 'collaborator-add'
   | 'collaborator-remove'
   | 'document-upload'
-  | 'document-download';
+  | 'document-download'
+  | 'user-save'
+  | 'criterion-save'
+  | 'assignment-create'
+  | 'assignment-delete'
+  | 'ai-ask'
+  | 'evaluation-save'
+  | 'milestone'
+  | 'report'
+  | 'investor-link';
 
 export const MAX_UPLOAD_MB = 10;
 export const UPLOAD_CLOSED =
@@ -27,7 +36,8 @@ export function describeError(err: unknown, context: ErrorContext = 'load'): str
 
   if (status === 0) return 'No se pudo contactar al servidor. Revisa tu conexión e inténtalo de nuevo.';
   if (status === 429) return 'Demasiadas solicitudes. Espera unos minutos e inténtalo de nuevo.';
-  if (status >= 500) return 'El servidor tuvo un problema. Inténtalo de nuevo en un momento.';
+  // A 503 from the assistant or the report generator has its own, more useful message below.
+  if (status >= 500 && context !== 'ai-ask' && context !== 'report') return 'El servidor tuvo un problema. Inténtalo de nuevo en un momento.';
 
   switch (context) {
     case 'status':
@@ -87,6 +97,62 @@ export function describeError(err: unknown, context: ErrorContext = 'load'): str
     case 'document-download':
       if (status === 403) return 'No tienes permiso para descargar este documento.';
       if (status === 404) return 'El documento ya no existe o no tienes acceso a él.';
+      break;
+    case 'user-save':
+      if (status === 400) return 'Revisa los campos marcados. La contraseña debe tener al menos 10 caracteres.';
+      if (status === 409) return 'Ya existe una cuenta con ese correo electrónico.';
+      if (status === 404) return 'El usuario ya no existe.';
+      if (status === 403) return 'No tienes permiso para administrar usuarios.';
+      break;
+    case 'criterion-save':
+      if (status === 400) return 'Revisa los campos marcados (puntaje máximo 1-100, peso entre 0.01 y 99.99).';
+      if (status === 404) return 'El criterio ya no existe.';
+      break;
+    case 'assignment-create': {
+      if (status === 422 && Array.isArray((body as { reasons?: Array<{ message: string }> }).reasons)) {
+        const reasons = (body as { reasons: Array<{ message: string }> }).reasons.map((r) => r.message).join(' ');
+        return `No se puede asignar a este juez: ${reasons}`;
+      }
+      if (status === 422) return body.error ?? 'No se puede asignar a este juez a este proyecto.';
+      if (status === 409) return 'Ese juez ya está asignado al proyecto, o el proyecto no está listo para evaluación (debe estar Enviado o En evaluación).';
+      if (status === 404) return 'El proyecto o el juez ya no existe.';
+      break;
+    }
+    case 'assignment-delete':
+      if (status === 409) return 'Esta asignación ya tiene evaluaciones registradas y no se puede quitar.';
+      if (status === 404) return 'La asignación ya no existe.';
+      break;
+    case 'ai-ask':
+      if (status === 503) return 'El asistente de IA no está disponible temporalmente. Inténtalo de nuevo en unos minutos.';
+      if (status === 400) return 'Escribe una pregunta de al menos 3 caracteres.';
+      if (status === 404) return 'El proyecto ya no existe o no tienes acceso a él.';
+      break;
+    case 'evaluation-save': {
+      const extra = body as { code?: string; missing?: Array<{ name: string }> };
+      if (status === 422 && extra.code === 'INCOMPLETE_EVALUATION') {
+        const names = (extra.missing ?? []).map((m) => `«${m.name}»`).join(', ');
+        return names ? `Falta calificar: ${names}. Guarda un borrador o completa todos los criterios.` : 'Todos los criterios deben tener calificación.';
+      }
+      if (status === 422) return body.error ?? 'Revisa las calificaciones.';
+      if (status === 403) return 'No puedes evaluar este proyecto: eres autor o colaborador del mismo.';
+      if (status === 409) return 'Este proyecto ya no admite cambios en tu evaluación (no está en evaluación o ya la enviaste).';
+      if (status === 404) return 'El proyecto no está asignado a ti.';
+      break;
+    }
+    case 'milestone':
+      if (status === 400) return 'Revisa el título y la fecha (AAAA-MM-DD).';
+      if (status === 403) return 'Solo el equipo del proyecto puede actualizar el avance.';
+      if (status === 409) return 'El avance no se puede cambiar cuando el proyecto ya está en evaluación.';
+      if (status === 404) return 'El hito ya no existe.';
+      break;
+    case 'report':
+      if (status === 503) return 'No se pudo generar el reporte. Inténtalo de nuevo.';
+      if (status === 403 || status === 404) return 'No tienes acceso al reporte de este proyecto.';
+      break;
+    case 'investor-link':
+      if (status === 409) return 'Ese inversionista ya está vinculado a ese proyecto.';
+      if (status === 422) return body.error ?? 'El usuario elegido no es un inversionista activo.';
+      if (status === 404) return 'El inversionista o el proyecto ya no existe.';
       break;
     default:
       if (status === 403) return 'No tienes permiso para ver este contenido.';

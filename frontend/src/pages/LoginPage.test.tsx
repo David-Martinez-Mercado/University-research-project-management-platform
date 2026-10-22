@@ -58,9 +58,8 @@ describe('LoginPage', () => {
 
     // The dashboard calls GET /projects with the stored token, and the refreshed one replaces it.
     await waitFor(() => expect(tokenStore.get()).toBe('jwt-2'));
-    const [projectsUrl, projectsInit] = fetchMock.mock.calls[1];
-    expect(String(projectsUrl)).toMatch(/\/projects/);
-    expect(new Headers(projectsInit?.headers).get('Authorization')).toBe('Bearer jwt-1');
+    const projectsCall = fetchMock.mock.calls.find(([u]) => /\/projects/.test(String(u)))!;
+    expect(new Headers(projectsCall[1]?.headers).get('Authorization')).toBe('Bearer jwt-1');
   });
 
   it('shows one generic message on 401 and keeps the user on the form', async () => {

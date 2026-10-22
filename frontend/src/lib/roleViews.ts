@@ -1,10 +1,12 @@
 import type { Role } from '../api/types';
+import type { IconName } from '../components/ui/Icon';
 
 export interface NavItem {
   to: string;
   label: string;
   /** true = active only on the exact path (so "/" is not active on every route). */
   end?: boolean;
+  icon?: IconName;
 }
 
 export interface RoleView {
@@ -19,8 +21,9 @@ export interface RoleView {
   nav: NavItem[];
 }
 
-const home = (label: string): NavItem => ({ to: '/', label, end: true });
-const NEW_PROJECT: NavItem = { to: '/projects/new', label: 'Nuevo proyecto' };
+const home = (label: string): NavItem => ({ to: '/', label, end: true, icon: 'folder' });
+const NOTIFICATIONS: NavItem = { to: '/notifications', label: 'Notificaciones', icon: 'bell' };
+const NEW_PROJECT: NavItem = { to: '/projects/new', label: 'Nuevo proyecto', icon: 'plus' };
 
 /** What each role sees. Only a UI convenience: the backend authorizes every call. */
 export const ROLE_VIEWS: Record<Role, RoleView> = {
@@ -31,7 +34,16 @@ export const ROLE_VIEWS: Record<Role, RoleView> = {
     emptyDescription: 'Cuando un investigador cree un proyecto aparecerá aquí.',
     canCreate: true,
     showStatusCounts: true,
-    nav: [home('Proyectos'), NEW_PROJECT],
+    nav: [
+      home('Proyectos'),
+      NEW_PROJECT,
+      { to: '/admin/users', label: 'Usuarios', icon: 'users' },
+      { to: '/admin/criteria', label: 'Criterios', icon: 'clipboard' },
+      { to: '/admin/assignments', label: 'Asignación de jueces', icon: 'gavel' },
+      { to: '/admin/investors', label: 'Inversionistas', icon: 'chart' },
+      { to: '/admin/ai', label: 'Actividad de IA', icon: 'search' },
+      NOTIFICATIONS,
+    ],
   },
   RESEARCHER: {
     dashboardTitle: 'Mis proyectos',
@@ -40,7 +52,7 @@ export const ROLE_VIEWS: Record<Role, RoleView> = {
     emptyDescription: 'Crea tu primer proyecto para empezar a subir documentos y sumar colaboradores.',
     canCreate: true,
     showStatusCounts: false,
-    nav: [home('Mis proyectos'), NEW_PROJECT],
+    nav: [home('Mis proyectos'), NEW_PROJECT, NOTIFICATIONS],
   },
   STUDENT: {
     dashboardTitle: 'Mis proyectos',
@@ -49,7 +61,7 @@ export const ROLE_VIEWS: Record<Role, RoleView> = {
     emptyDescription: 'Un investigador debe agregarte como colaborador para que veas un proyecto aquí.',
     canCreate: false,
     showStatusCounts: false,
-    nav: [home('Mis proyectos')],
+    nav: [home('Mis proyectos'), NOTIFICATIONS],
   },
   JUDGE: {
     dashboardTitle: 'Proyectos asignados',
@@ -58,7 +70,7 @@ export const ROLE_VIEWS: Record<Role, RoleView> = {
     emptyDescription: 'Un administrador debe asignarte proyectos para que aparezcan aquí.',
     canCreate: false,
     showStatusCounts: false,
-    nav: [home('Proyectos asignados')],
+    nav: [home('Proyectos asignados'), NOTIFICATIONS],
   },
   INVESTOR: {
     dashboardTitle: 'Proyectos vinculados',
@@ -67,6 +79,6 @@ export const ROLE_VIEWS: Record<Role, RoleView> = {
     emptyDescription: 'Un administrador debe vincular proyectos a tu cuenta para que aparezcan aquí.',
     canCreate: false,
     showStatusCounts: false,
-    nav: [home('Proyectos vinculados')],
+    nav: [home('Proyectos vinculados'), NOTIFICATIONS],
   },
 };

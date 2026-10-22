@@ -10,7 +10,7 @@ export function ProjectList({ projects, currentUserId }: { projects: Project[]; 
     <ul className="space-y-3">
       {projects.map((project) => (
         <li key={project.id}>
-          <Card>
+          <Card className="border-l-4 border-l-brand-500 transition-shadow hover:shadow-md">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <h3 className="break-words text-base font-semibold">

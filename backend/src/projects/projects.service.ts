@@ -2,6 +2,7 @@ import { Prisma, type CollaboratorRole, type Project, type ProjectStatus } from 
 import { prisma } from '../db/prisma';
 import { HttpError } from '../errors';
 import type { AuthUser } from '../middleware/authenticate';
+import { activeAdminIds, notifyUsers, projectTeamIds } from '../notifications/notifications.service';
 import { allowedNextStatuses, findTransition, missingForSubmission } from './projects.lifecycle';
 import type {
   AddCollaboratorInput,
@@ -149,7 +150,44 @@ export async function changeStatus(id: string, to: ProjectStatus, user: AuthUser
   // Compare-and-set on the current status: two concurrent transitions cannot both win.
   const { count } = await prisma.project.updateMany({ where: { id, status: from }, data });
   if (count === 0) throw new HttpError(409, 'Project status changed concurrently; reload and retry');
-  return toPublicProject(await prisma.project.findUniqueOrThrow({ where: { id } }));
+  const updated = await prisma.project.findUniqueOrThrow({ where: { id } });
+  await notifyStatusChange(updated, from, to, user);
+  return toPublicProject(updated);
+}
+
+const STATUS_ES: Record<ProjectStatus, string> = {
+  DRAFT: 'Borrador',
+  SUBMITTED: 'Enviado',
+  UNDER_EVALUATION: 'En evaluación',
+  EVALUATED: 'Evaluado',
+  ARCHIVED: 'Archivado',
+};
+
+/** In-app notifications for a transition (FR-019). Never fails the request. */
+async function notifyStatusChange(project: Project, from: ProjectStatus, to: ProjectStatus, actor: AuthUser) {
+  const base = { projectId: project.id, type: 'PROJECT_STATUS' as const };
+  if (to === 'SUBMITTED') {
+    await notifyUsers(await activeAdminIds(), {
+      ...base,
+      title: 'Proyecto enviado',
+      message: `«${project.title}» fue enviado para evaluación. Asigna jueces desde el panel.`,
+    });
+    return;
+  }
+  const team = await projectTeamIds(project.id, actor.id);
+  await notifyUsers(team, {
+    ...base,
+    title: 'Cambió el estado del proyecto',
+    message: `«${project.title}» pasó de ${STATUS_ES[from]} a ${STATUS_ES[to]}.`,
+  });
+  if (to === 'UNDER_EVALUATION') {
+    const judges = await prisma.judgeAssignment.findMany({ where: { projectId: project.id }, select: { judgeId: true } });
+    await notifyUsers(judges.map((j) => j.judgeId), {
+      ...base,
+      title: 'Ya puedes evaluar',
+      message: `«${project.title}» está en evaluación. Registra tu calificación en la rúbrica.`,
+    });
+  }
 }
 
 // ---- Collaborators -------------------------------------------------------------------------
@@ -235,6 +273,12 @@ export async function addCollaborator(projectId: string, input: AddCollaboratorI
     }
     throw err;
   }
+  await notifyUsers([target.id], {
+    projectId,
+    type: 'COLLABORATOR_ADDED',
+    title: 'Te agregaron a un proyecto',
+    message: `Ahora colaboras en «${project.title}».`,
+  });
   return listCollaborators(projectId, user);
 }
 

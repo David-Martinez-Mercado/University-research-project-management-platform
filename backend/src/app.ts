@@ -4,6 +4,11 @@ import helmet from 'helmet';
 import { authRouter } from './auth/auth.routes';
 import { env } from './config/env';
 import { criteriaRouter, rubricRouter } from './criteria/criteria.routes';
+import { aiRouter, projectAiRouter } from './ai/ai.routes';
+import { evaluationsRouter, projectEvaluationRouter } from './evaluations/evaluations.routes';
+import { investorLinksRouter, investorsRouter, reportRouter } from './investors/investors.routes';
+import { notificationsRouter } from './notifications/notifications.routes';
+import { milestonesRouter } from './projects/milestones';
 import { documentsRouter } from './documents/documents.routes';
 import { judgeAssignmentsRouter, judgesRouter } from './judging/judging.routes';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
@@ -36,7 +41,16 @@ export function createApp() {
   app.use('/projects', projectsRouter);
   app.use('/projects', documentsRouter);
   app.use('/projects', rubricRouter);
+  app.use('/projects', projectEvaluationRouter);
+  app.use('/projects', milestonesRouter);
+  app.use('/projects', projectAiRouter);
+  app.use('/projects', reportRouter);
   app.use('/criteria', criteriaRouter);
+  app.use('/evaluations', evaluationsRouter);
+  app.use('/investor-links', investorLinksRouter);
+  app.use('/investors', investorsRouter);
+  app.use('/notifications', notificationsRouter);
+  app.use('/ai', aiRouter);
   app.use('/judge-assignments', judgeAssignmentsRouter);
   app.use('/judges', judgesRouter);
 

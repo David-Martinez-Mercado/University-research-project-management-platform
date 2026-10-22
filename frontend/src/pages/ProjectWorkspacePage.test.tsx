@@ -36,12 +36,12 @@ function open(
 const tabNames = () => screen.getAllByRole('tab').map((t) => t.textContent);
 
 describe('project workspace: tabs', () => {
-  it('RESEARCHER sees the five tabs with tablist semantics and moves with the arrow keys', async () => {
+  it('RESEARCHER sees the seven tabs with tablist semantics and moves with the arrow keys', async () => {
     const owner = makeUser('RESEARCHER');
     open(owner, makeProject({ ownerId: owner.id }), [makeCollaborator({ userId: owner.id })]);
 
     expect(await screen.findByRole('tablist', { name: 'Secciones del proyecto' })).toBeInTheDocument();
-    expect(tabNames()).toEqual(['Vista general', 'Documentos', 'Colaboradores', 'Asistente IA', 'Progreso']);
+    expect(tabNames()).toEqual(['Vista general', 'Documentos', 'Colaboradores', 'Rúbrica', 'Asistente IA', 'Progreso', 'Resultados']);
     const [overview, documents, collaborators] = screen.getAllByRole('tab');
     expect(overview).toHaveAttribute('aria-selected', 'true');
     expect(overview).toHaveAttribute('tabindex', '0');
@@ -60,24 +60,31 @@ describe('project workspace: tabs', () => {
     expect(collaborators).toHaveAttribute('aria-selected', 'true');
 
     await user.keyboard('{End}');
-    expect(screen.getByRole('tab', { name: 'Progreso' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Resultados' })).toHaveAttribute('aria-selected', 'true');
     await user.keyboard('{ArrowRight}'); // wraps around
     expect(overview).toHaveAttribute('aria-selected', 'true');
     await user.keyboard('{ArrowLeft}'); // wraps the other way
-    expect(screen.getByRole('tab', { name: 'Progreso' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Resultados' })).toHaveAttribute('aria-selected', 'true');
     await user.keyboard('{Home}');
     expect(overview).toHaveFocus();
   });
 
-  it('Asistente IA and Progreso are labelled placeholders for a later week, with no fake data', async () => {
+  it('Asistente IA, Progreso and Resultados load their real data (no placeholders)', async () => {
     const owner = makeUser('RESEARCHER');
-    open(owner, makeProject({ ownerId: owner.id }), [makeCollaborator({ userId: owner.id })]);
+    open(owner, makeProject({ ownerId: owner.id }), [makeCollaborator({ userId: owner.id })], {
+      [`GET ${base}/ai-history`]: () => jsonResponse(200, { data: [] }),
+      [`GET ${base}/milestones`]: () => jsonResponse(200, { data: [], progressPercent: 0 }),
+      [`GET ${base}/results`]: () =>
+        jsonResponse(200, { projectId: project0.id, status: 'DRAFT', closed: false, judgesAssigned: 0, judgesCompleted: 0, results: null }),
+    });
     const user = userEvent.setup();
 
     await user.click(await screen.findByRole('tab', { name: 'Asistente IA' }));
-    expect(screen.getByText(/Asistente IA: disponible en una semana posterior/)).toBeInTheDocument();
+    expect(await screen.findByText('Aún no has hecho preguntas')).toBeInTheDocument();
     await user.click(screen.getByRole('tab', { name: 'Progreso' }));
-    expect(screen.getByText(/Progreso: disponible en una semana posterior/)).toBeInTheDocument();
+    expect(await screen.findByText('Aún no hay hitos')).toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: 'Resultados' }));
+    expect(await screen.findByText('Los resultados aún no están disponibles')).toBeInTheDocument();
   });
 
   it('INVESTOR has no Documents or Collaborators tab and never requests those endpoints', async () => {
@@ -85,7 +92,7 @@ describe('project workspace: tabs', () => {
     const fetchMock = open(investor, makeProject({ status: 'SUBMITTED', allowedNextStatuses: [] }), [], {}, '?tab=documents');
 
     expect(await screen.findByRole('tablist')).toBeInTheDocument();
-    expect(tabNames()).toEqual(['Vista general', 'Asistente IA', 'Progreso']);
+    expect(tabNames()).toEqual(['Vista general', 'Progreso', 'Resultados']);
     // A deep link to the hidden tab falls back to the overview.
     expect(screen.getByRole('tab', { name: 'Vista general' })).toHaveAttribute('aria-selected', 'true');
     expect(callsTo(fetchMock, `GET ${base}/documents`)).toHaveLength(0);
@@ -97,7 +104,7 @@ describe('project workspace: tabs', () => {
     open(makeUser('JUDGE'), makeProject({ status: 'SUBMITTED', allowedNextStatuses: [] }), [], {}, '?tab=documents');
 
     expect(await screen.findByText('Aún no hay documentos')).toBeInTheDocument();
-    expect(tabNames()).toEqual(['Vista general', 'Documentos', 'Asistente IA', 'Progreso']);
+    expect(tabNames()).toEqual(['Vista general', 'Documentos', 'Rúbrica', 'Mi evaluación', 'Asistente IA', 'Progreso', 'Resultados']);
     expect(screen.queryByRole('button', { name: 'Subir documento' })).not.toBeInTheDocument();
   });
 

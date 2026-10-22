@@ -112,3 +112,212 @@ export interface ProjectDocument {
   uploadedAt: string;
   uploadedBy: { id: string; fullName: string };
 }
+
+export interface Criterion {
+  id: string;
+  name: string;
+  description: string | null;
+  maxScore: number;
+  weight: number;
+  position: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CriterionInput {
+  name: string;
+  description?: string | null;
+  maxScore?: number;
+  weight?: number;
+  position?: number;
+  isActive?: boolean;
+}
+
+export type AssignmentStatus = 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED';
+
+export interface JudgeAssignment {
+  id: string;
+  projectId: string;
+  judgeId: string;
+  assignedById: string;
+  status: AssignmentStatus;
+  assignedAt: string;
+  completedAt: string | null;
+  judge: { id: string; fullName: string; email: string; affiliation: string | null };
+  project: { id: string; title: string; status: ProjectStatus };
+}
+
+export interface CreateUserInput {
+  email: string;
+  password: string;
+  fullName: string;
+  role: Role;
+  affiliation?: string;
+}
+
+export interface UserPatch {
+  fullName?: string;
+  role?: Role;
+  affiliation?: string | null;
+  isActive?: boolean;
+  password?: string;
+  unlockAccount?: true;
+}
+
+// ---- Notifications ----
+export type NotificationType =
+  | 'PROJECT_STATUS'
+  | 'JUDGE_ASSIGNED'
+  | 'EVALUATION_SUBMITTED'
+  | 'DOCUMENT_UPLOADED'
+  | 'COLLABORATOR_ADDED'
+  | 'SYSTEM';
+
+export interface AppNotification {
+  id: string;
+  projectId: string | null;
+  type: NotificationType;
+  title: string;
+  message: string;
+  isRead: boolean;
+  createdAt: string;
+  readAt: string | null;
+}
+
+export interface NotificationPage extends Page<AppNotification> {
+  unread: number;
+}
+
+// ---- Milestones / progress ----
+export interface Milestone {
+  id: string;
+  title: string;
+  dueDate: string | null;
+  completed: boolean;
+  completedAt: string | null;
+  createdAt: string;
+}
+
+export interface MilestoneList {
+  data: Milestone[];
+  progressPercent: number;
+}
+
+// ---- Evaluation (judge) ----
+export interface EvaluationCriterionState {
+  criterionId: string;
+  name: string;
+  description: string | null;
+  maxScore: number;
+  weight: number;
+  score: number | null;
+  comments: string | null;
+}
+
+export interface MyEvaluation {
+  projectId: string;
+  project: { id: string; title: string; status: ProjectStatus };
+  assignment: { id: string; status: AssignmentStatus; completedAt: string | null };
+  state: 'NOT_STARTED' | 'DRAFT' | 'SUBMITTED';
+  canEdit: boolean;
+  criteria: EvaluationCriterionState[];
+  projectClosed?: boolean;
+}
+
+export interface EvaluationScoreInput {
+  criterionId: string;
+  score?: number | null;
+  comments?: string | null;
+}
+
+export interface ResultsCriterion {
+  criterionId: string;
+  name: string;
+  maxScore: number;
+  weight: number;
+  average: number | null;
+  comments: Array<{ judge: string | null; comment: string }>;
+}
+
+export interface ProjectResults {
+  projectId: string;
+  status: ProjectStatus;
+  closed: boolean;
+  judgesAssigned: number;
+  judgesCompleted: number;
+  results: null | {
+    overallPercent: number | null;
+    criteria: ResultsCriterion[];
+    byJudge?: Array<{ judge: string; criterionId: string; score: number | null }>;
+  };
+}
+
+// ---- Investors ----
+export interface InvestorLink {
+  id: string;
+  investorId: string;
+  projectId: string;
+  createdAt: string;
+  investor: { id: string; fullName: string; email: string };
+  project: { id: string; title: string; status: ProjectStatus };
+}
+
+export interface InvestorProject {
+  id: string;
+  title: string;
+  summary: string | null;
+  researchArea: string | null;
+  status: ProjectStatus;
+  ownerName: string;
+  createdAt: string;
+  updatedAt: string;
+  progressPercent: number;
+  milestones: Milestone[];
+  evaluation: { judgesAssigned: number; judgesCompleted: number; closed: boolean; overallPercent: number | null };
+}
+
+export interface InvestorDashboard extends Page<InvestorProject> {
+  investorId: string;
+  summary: {
+    totalLinked: number;
+    byStatus: Partial<Record<ProjectStatus, number>>;
+    researchAreas: string[];
+  };
+}
+
+// ---- AI assistant ----
+export interface AiSource {
+  documentId: string;
+  fileName: string;
+  chunkIndex: number;
+  pageNumber: number | null;
+  similarity: number;
+  excerpt: string;
+}
+
+export interface AiExchange {
+  interactionId: string;
+  question: string;
+  answer: string | null;
+  /** Set when the assistant refused for lack of relevant information (AIR-004). */
+  message: string | null;
+  fallback: boolean;
+  flagged: boolean;
+  createdAt?: string;
+  sources: AiSource[];
+}
+
+export interface AiInteractionRow {
+  id: string;
+  user: string;
+  project: { id: string; title: string } | null;
+  question: string;
+  answer: string | null;
+  fallback: boolean;
+  flagged: boolean;
+  confidence: number | null;
+  latencyMs: number | null;
+  model: string | null;
+  createdAt: string;
+}
