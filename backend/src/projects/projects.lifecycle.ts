@@ -2,7 +2,7 @@ import type { ProjectStatus } from '@prisma/client';
 
 /**
  * Who may perform a transition:
- *  - MANAGER: the project owner, a LEAD collaborator, or an ADMINISTRATOR.
+ *  - MANAGER: the project owner or an ADMINISTRATOR (collaborators never submit; BR-004).
  *  - ADMIN:   ADMINISTRATOR only.
  */
 export type TransitionActor = 'MANAGER' | 'ADMIN';

@@ -17,7 +17,7 @@ import {
 
 vi.mock('../../lib/saveBlob', () => ({ saveBlob: vi.fn() }));
 
-const owner = makeUser('RESEARCHER');
+const owner = makeUser('USER');
 const project = makeProject({ ownerId: owner.id });
 const base = `/projects/${project.id}`;
 
@@ -135,7 +135,7 @@ describe('Documents tab', () => {
     [413, 'El archivo supera el tamaño máximo permitido (10 MB).'],
     [415, 'El tipo de archivo no es compatible, o su contenido no coincide con su extensión.'],
     [400, 'El servidor rechazó el archivo (por ejemplo, está vacío'],
-    [403, 'No tienes permiso para subir documentos a este proyecto.'],
+    [403, 'Solo tienes permiso de lectura en este proyecto: no puedes subir documentos.'],
     [404, 'El proyecto ya no existe o no tienes acceso a él.'],
     [409, 'Solo se pueden subir documentos mientras el proyecto está en Borrador o Enviado.'],
   ])('maps the %s of an upload', async (status, message) => {

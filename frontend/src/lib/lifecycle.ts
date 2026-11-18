@@ -8,7 +8,7 @@ import type { ProjectStatus, Role } from '../api/types';
 export interface TransitionAction {
   from: ProjectStatus;
   to: ProjectStatus;
-  /** MANAGER = owner, LEAD collaborator or administrator; ADMIN = administrator only. */
+  /** MANAGER = owner or administrator (collaborators never submit); ADMIN = administrator only. */
   actor: 'MANAGER' | 'ADMIN';
   label: string;
 }

@@ -70,7 +70,7 @@ describe('shared UI components', () => {
     render(
       <MemoryRouter initialEntries={['/projects/new']}>
         <AppShell
-          user={{ fullName: 'Rita', role: 'RESEARCHER' }}
+          user={{ fullName: 'Rita', role: 'USER' }}
           nav={[
             { to: '/', label: 'Mis proyectos', end: true },
             { to: '/projects/new', label: 'Nuevo proyecto' },

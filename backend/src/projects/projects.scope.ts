@@ -7,7 +7,7 @@ import type { AuthUser } from '../middleware/authenticate';
  * Unknown roles get a clause that matches nothing (default deny).
  *
  *  - ADMINISTRATOR: everything
- *  - RESEARCHER / STUDENT: projects they own or collaborate on
+ *  - USER: projects they own or collaborate on
  *  - JUDGE: projects with a JudgeAssignment for them
  *  - INVESTOR: projects with an InvestorProjectLink for them
  */
@@ -15,8 +15,7 @@ export function visibleProjectsWhere(user: Pick<AuthUser, 'id' | 'role'>): Prism
   switch (user.role) {
     case 'ADMINISTRATOR':
       return {};
-    case 'RESEARCHER':
-    case 'STUDENT':
+    case 'USER':
       return { OR: [{ ownerId: user.id }, { collaborators: { some: { userId: user.id } } }] };
     case 'JUDGE':
       return { judgeAssignments: { some: { judgeId: user.id } } };

@@ -8,10 +8,12 @@ export interface WorkspaceContext {
   role: Role;
   userId: string;
   /**
-   * Owner, LEAD collaborator or administrator. Derived from data the backend returned and used only
+   * Owner or administrator: submits the project and controls collaborators and their view/edit permission. Derived from data the backend returned and used only
    * to decide which controls to show; the backend re-checks every write.
    */
   canManage: boolean;
+  /** Owner, EDITOR collaborator or administrator: may change content, documents and progress. */
+  canEdit: boolean;
   /** Undefined state for roles that cannot read collaborators (JUDGE, INVESTOR). */
   collaborators: AsyncState<Collaborator[]> | null;
 }

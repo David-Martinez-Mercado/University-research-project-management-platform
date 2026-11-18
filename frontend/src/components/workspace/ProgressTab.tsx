@@ -9,11 +9,11 @@ import { Alert, Button, Card, EmptyState, Input, ProgressBar, Spinner } from '..
 import type { WorkspaceContext } from './types';
 
 /** Milestones and progress (FR-017). Only the team edits, and only until the project goes under evaluation. */
-export function ProgressTab({ project, role }: WorkspaceContext) {
+export function ProgressTab({ project, role, canEdit: mayEdit }: WorkspaceContext) {
   const milestones = useAsync(() => listMilestones(project.id), [project.id]);
   const isTeam = PROJECT_TEAM_ROLES.includes(role);
   const open = project.status === 'DRAFT' || project.status === 'SUBMITTED';
-  const canEdit = isTeam && open;
+  const canEdit = isTeam && mayEdit && open;
 
   const [title, setTitle] = useState('');
   const [dueDate, setDueDate] = useState('');
@@ -82,7 +82,7 @@ export function ProgressTab({ project, role }: WorkspaceContext) {
         </p>
       </Card>
 
-      {isTeam && !open && (
+      {isTeam && mayEdit && !open && (
         <Alert tone="info">El avance está bloqueado porque el proyecto ya está en evaluación o fue evaluado.</Alert>
       )}
       {error && <Alert tone="error">{error}</Alert>}

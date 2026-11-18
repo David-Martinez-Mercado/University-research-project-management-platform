@@ -3,6 +3,7 @@ import type { Prisma, ProjectStatus } from '@prisma/client';
 import { prisma } from '../db/prisma';
 import { HttpError } from '../errors';
 import type { AuthUser } from '../middleware/authenticate';
+import { loadEditableProject } from '../projects/projects.access';
 import { visibleProjectsWhere } from '../projects/projects.scope';
 import { validateUpload } from './documents.content';
 import { emitDocumentUploaded } from './documents.events';
@@ -52,7 +53,8 @@ function assertUploadable(status: ProjectStatus) {
  * make the server buffer a file. Re-validated inside the transaction by createDocument().
  */
 export async function assertCanUpload(projectId: string, user: AuthUser): Promise<void> {
-  const project = await loadVisibleProject(projectId, user);
+  // View-only collaborators and non-team users cannot upload (the owner controls who edits).
+  const { project } = await loadEditableProject(projectId, user);
   assertUploadable(project.status);
 }
 
@@ -78,7 +80,7 @@ export async function createDocument(
       // Share-lock the project row: a concurrent status change (UPDATE) waits for this
       // transaction, so a document cannot slip into a project that just left DRAFT/SUBMITTED.
       await tx.$queryRaw`SELECT id FROM projects WHERE id = ${projectId}::uuid FOR SHARE`;
-      const project = await loadVisibleProject(projectId, user, tx);
+      const { project } = await loadEditableProject(projectId, user, tx);
       assertUploadable(project.status);
 
       return tx.document.create({

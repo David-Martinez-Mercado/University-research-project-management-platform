@@ -21,6 +21,8 @@ const schema = z
     LOGIN_MAX_FAILED_ATTEMPTS: z.coerce.number().int().positive().default(5),
     LOGIN_FAILURE_WINDOW_MINUTES: z.coerce.number().int().positive().default(10),
     LOCKOUT_MINUTES: z.coerce.number().int().positive().default(15),
+    // Optional: restrict public signup to one institutional domain (e.g. unipolidgo.edu.mx). Empty = any email.
+    SIGNUP_EMAIL_DOMAIN: optionalString.transform((v) => v?.toLowerCase().replace(/^@/, '')),
     // Guards POST /auth/bootstrap-owner. Required in production.
     BOOTSTRAP_OWNER_SECRET: optionalString,
     CORS_ORIGIN: z.string().default('http://localhost:5173'),

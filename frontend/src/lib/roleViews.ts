@@ -14,7 +14,7 @@ export interface RoleView {
   dashboardIntro: string;
   emptyTitle: string;
   emptyDescription: string;
-  /** Whether the dashboard offers "Nuevo proyecto". Mirrors POST /projects (RESEARCHER, ADMINISTRATOR). */
+  /** Whether the dashboard offers "Nuevo proyecto". Mirrors POST /projects (USER, ADMINISTRATOR). */
   canCreate: boolean;
   /** Admin dashboards show a count per status. */
   showStatusCounts: boolean;
@@ -45,27 +45,18 @@ export const ROLE_VIEWS: Record<Role, RoleView> = {
       NOTIFICATIONS,
     ],
   },
-  RESEARCHER: {
+  USER: {
     dashboardTitle: 'Mis proyectos',
-    dashboardIntro: 'Proyectos que diriges o en los que colaboras.',
+    dashboardIntro: 'Proyectos que creaste o en los que colaboras.',
     emptyTitle: 'Aún no hay proyectos',
-    emptyDescription: 'Crea tu primer proyecto para empezar a subir documentos y sumar colaboradores.',
+    emptyDescription: 'Crea tu primer proyecto o pide a alguien que te agregue como colaborador.',
     canCreate: true,
     showStatusCounts: false,
     nav: [home('Mis proyectos'), NEW_PROJECT, NOTIFICATIONS],
   },
-  STUDENT: {
-    dashboardTitle: 'Mis proyectos',
-    dashboardIntro: 'Proyectos en los que colaboras.',
-    emptyTitle: 'Aún no hay proyectos',
-    emptyDescription: 'Un investigador debe agregarte como colaborador para que veas un proyecto aquí.',
-    canCreate: false,
-    showStatusCounts: false,
-    nav: [home('Mis proyectos'), NOTIFICATIONS],
-  },
   JUDGE: {
     dashboardTitle: 'Proyectos asignados',
-    dashboardIntro: 'Proyectos que se te asignaron para evaluar (solo lectura).',
+    dashboardIntro: 'Proyectos que se te asignaron para revisar y calificar.',
     emptyTitle: 'Aún no hay proyectos asignados',
     emptyDescription: 'Un administrador debe asignarte proyectos para que aparezcan aquí.',
     canCreate: false,

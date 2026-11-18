@@ -20,15 +20,15 @@ function Detail({ label, children }: { label: string; children: ReactNode }) {
 
 const NOT_SET = <span className="text-slate-500">Sin definir</span>;
 
-export function OverviewTab({ project, onProjectChange, role, canManage, collaborators }: WorkspaceContext) {
+export function OverviewTab({ project, onProjectChange, role, canManage, canEdit: mayEdit, collaborators }: WorkspaceContext) {
   const [editing, setEditing] = useState(false);
   const [busyTo, setBusyTo] = useState<ProjectStatus | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
 
   const isAdmin = role === 'ADMINISTRATOR';
-  // Same rule as the backend: managers edit DRAFT only; the administrator edits in any status.
-  const canEdit = canManage && (isAdmin || project.status === 'DRAFT');
+  // Same rule as the backend: the owner and EDITOR collaborators edit DRAFT only; the administrator edits in any status.
+  const canEdit = mayEdit && (isAdmin || project.status === 'DRAFT');
   const actions = offeredActions(project.status, project.allowedNextStatuses, role, canManage);
   const owner = collaborators?.data?.find((c) => c.isOwner);
 
@@ -55,7 +55,9 @@ export function OverviewTab({ project, onProjectChange, role, canManage, collabo
         description={
           canManage || isAdmin
             ? 'Las acciones disponibles dependen del estado actual y de tu rol.'
-            : 'Vista de solo lectura.'
+            : mayEdit
+              ? 'Puedes editar el proyecto mientras esté en borrador. Solo el dueño lo envía a revisión.'
+              : 'Vista de solo lectura.'
         }
       >
         <div className="space-y-4">
@@ -107,7 +109,7 @@ export function OverviewTab({ project, onProjectChange, role, canManage, collabo
         <Card
           title="Información del proyecto"
           description={
-            !canEdit && canManage ? 'Solo se puede editar mientras el proyecto está en borrador.' : undefined
+            !canEdit && mayEdit ? 'Solo se puede editar mientras el proyecto está en borrador.' : undefined
           }
           footer={
             canEdit ? (

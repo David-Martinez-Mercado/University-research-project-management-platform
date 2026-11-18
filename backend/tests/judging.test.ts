@@ -35,7 +35,7 @@ const countAssignments = () => prisma.judgeAssignment.count();
 /** Admin + researcher-owned SUBMITTED project (affiliation "Universidad Politecnica de Durango"). */
 async function world() {
   const admin = await as('ADMINISTRATOR');
-  const owner = await as('RESEARCHER', 'Universidad Politecnica de Durango');
+  const owner = await as('USER', 'Universidad Politecnica de Durango');
   const project = await mkProject(owner.user.id);
   return { admin, owner, project };
 }
@@ -52,7 +52,7 @@ describe('authentication and RBAC', () => {
     for (const c of calls) expect((await c).status).toBe(401);
   });
 
-  it.each(['RESEARCHER', 'STUDENT', 'JUDGE', 'INVESTOR'] as const)('forbids %s on /judge-assignments (403)', async (role) => {
+  it.each(['USER', 'USER', 'JUDGE', 'INVESTOR'] as const)('forbids %s on /judge-assignments (403)', async (role) => {
     const { project } = await world();
     const judge = await as('JUDGE', 'MIT');
     const a = await as(role);
@@ -62,7 +62,7 @@ describe('authentication and RBAC', () => {
     expect(await countAssignments()).toBe(0);
   });
 
-  it.each(['RESEARCHER', 'STUDENT', 'INVESTOR'] as const)('forbids %s on GET /judges/:id/projects (403)', async (role) => {
+  it.each(['USER', 'USER', 'INVESTOR'] as const)('forbids %s on GET /judges/:id/projects (403)', async (role) => {
     const judge = await as('JUDGE', 'MIT');
     const a = await as(role);
     expect((await api().get(`/judges/${judge.user.id}/projects`).set(a.h)).status).toBe(403);
@@ -121,7 +121,7 @@ describe('POST /judge-assignments - conflict of interest (FR-010) BLOCKS the ass
   it('rejects (422) a judge who COLLABORATES on the project, even with a different affiliation', async () => {
     const { admin, project } = await world();
     const judge = await as('JUDGE', 'MIT');
-    await prisma.projectCollaborator.create({ data: { projectId: project.id, userId: judge.user.id, role: 'MEMBER' } });
+    await prisma.projectCollaborator.create({ data: { projectId: project.id, userId: judge.user.id, role: 'VIEWER' } });
     const res = await assign(admin, project.id, judge.user.id);
     expect(res.status).toBe(422);
     expect(res.body.code).toBe('CONFLICT_OF_INTEREST');
@@ -159,7 +159,7 @@ describe('POST /judge-assignments - conflict of interest (FR-010) BLOCKS the ass
 
   it('FAILS CLOSED when the project affiliation is missing', async () => {
     const admin = await as('ADMINISTRATOR');
-    const owner = await as('RESEARCHER');
+    const owner = await as('USER');
     const project = await mkProject(owner.user.id, { affiliation: null });
     const judge = await as('JUDGE', 'MIT');
     const res = await assign(admin, project.id, judge.user.id);
@@ -241,7 +241,7 @@ describe('POST /judge-assignments - other rules', () => {
     ['ARCHIVED', 409],
   ] as const)('project in %s -> %i', async (status, expected) => {
     const admin = await as('ADMINISTRATOR');
-    const owner = await as('RESEARCHER');
+    const owner = await as('USER');
     const project = await mkProject(owner.user.id, { status });
     const judge = await as('JUDGE', 'MIT');
     expect((await assign(admin, project.id, judge.user.id)).status).toBe(expected);
@@ -249,7 +249,7 @@ describe('POST /judge-assignments - other rules', () => {
 
   it('rejects users that are not active judges (422) and unknown ids (404)', async () => {
     const { admin, project } = await world();
-    const researcher = await as('RESEARCHER', 'MIT');
+    const researcher = await as('USER', 'MIT');
     const inactive = await as('JUDGE', 'MIT');
     await prisma.user.update({ where: { id: inactive.user.id }, data: { isActive: false } });
     expect((await assign(admin, project.id, researcher.user.id)).status).toBe(422);

@@ -107,7 +107,7 @@ describe('AI assistant tab', () => {
 
   it('shows answers labeled as AI with sources, the fallback message, errors, and reports an answer', async () => {
     let n = 0;
-    const fetchMock = signedInAs(makeUser('RESEARCHER', { id: project.ownerId }), {
+    const fetchMock = signedInAs(makeUser('USER', { id: project.ownerId }), {
       [`GET ${base}`]: () => jsonResponse(200, project),
       [`GET ${base}/collaborators`]: () => jsonResponse(200, { data: [] }),
       [`GET ${base}/ai-history`]: () => jsonResponse(200, { data: [] }),
@@ -156,7 +156,7 @@ describe('progress tab', () => {
   it('lets the team add and complete milestones; is read-only once under evaluation', async () => {
     const draft = makeProject({ status: 'DRAFT' });
     let list = { data: [] as unknown[], progressPercent: 0 };
-    const fetchMock = signedInAs(makeUser('RESEARCHER', { id: draft.ownerId }), {
+    const fetchMock = signedInAs(makeUser('USER', { id: draft.ownerId }), {
       [`GET /projects/${draft.id}`]: () => jsonResponse(200, draft),
       [`GET /projects/${draft.id}/collaborators`]: () => jsonResponse(200, { data: [] }),
       [`GET /projects/${draft.id}/milestones`]: () => jsonResponse(200, list),
@@ -192,7 +192,7 @@ describe('progress tab', () => {
   });
 
   it('hides edit controls and explains the lock when the project is under evaluation', async () => {
-    const owner = makeUser('RESEARCHER');
+    const owner = makeUser('USER');
     signedInAs(owner, {
       [`GET ${base}`]: () => jsonResponse(200, { ...project, ownerId: owner.id }),
       [`GET ${base}/collaborators`]: () => jsonResponse(200, { data: [] }),
@@ -231,7 +231,7 @@ describe('results tab', () => {
   });
 
   it('researchers see the "not yet available" state and no report button', async () => {
-    const owner = makeUser('RESEARCHER');
+    const owner = makeUser('USER');
     signedInAs(owner, {
       [`GET ${base}`]: () => jsonResponse(200, { ...project, ownerId: owner.id }),
       [`GET ${base}/collaborators`]: () => jsonResponse(200, { data: [] }),
@@ -246,7 +246,7 @@ describe('results tab', () => {
 
 describe('notifications', () => {
   it('shows the unread counter in the sidebar and marks notifications as read', async () => {
-    const researcher = makeUser('RESEARCHER');
+    const researcher = makeUser('USER');
     let unread = 2;
     const items = [
       { id: 'n1', projectId: project.id, type: 'PROJECT_STATUS', title: 'Proyecto evaluado', message: 'Ya hay resultados', isRead: false, createdAt: '2026-10-20T10:00:00Z', readAt: null },

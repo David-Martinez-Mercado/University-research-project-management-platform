@@ -15,7 +15,7 @@ async function main() {
   try {
     await prisma.$transaction(async (tx) => {
       const researcher = await tx.user.create({
-        data: { email: 'smoke.researcher@test.local', passwordHash: 'x', fullName: 'Smoke Researcher', role: 'RESEARCHER', affiliation: 'Unipoli' },
+        data: { email: 'smoke.researcher@test.local', passwordHash: 'x', fullName: 'Smoke Researcher', role: 'USER', affiliation: 'Unipoli' },
       });
       const judge = await tx.user.create({
         data: { email: 'smoke.judge@test.local', passwordHash: 'x', fullName: 'Smoke Judge', role: 'JUDGE' },

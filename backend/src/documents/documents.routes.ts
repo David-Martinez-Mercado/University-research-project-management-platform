@@ -9,9 +9,9 @@ import { receiveUpload } from './documents.upload';
 export const documentsRouter = Router();
 
 // Role gates only; which project the caller may touch is decided in the service, inside the query.
-const UPLOAD_ROLES = ['ADMINISTRATOR', 'RESEARCHER', 'STUDENT'] as const;
+const UPLOAD_ROLES = ['ADMINISTRATOR', 'USER'] as const;
 // INVESTOR is intentionally absent: investors never read raw documents.
-const READ_ROLES = ['ADMINISTRATOR', 'RESEARCHER', 'STUDENT', 'JUDGE'] as const;
+const READ_ROLES = ['ADMINISTRATOR', 'USER', 'JUDGE'] as const;
 
 documentsRouter.post(
   '/:id/documents',

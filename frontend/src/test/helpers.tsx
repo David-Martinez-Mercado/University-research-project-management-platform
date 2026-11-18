@@ -10,7 +10,7 @@ export const TEST_USER: User = {
   id: '00000000-0000-4000-8000-000000000001',
   email: 'rita@example.edu',
   fullName: 'Rita Researcher',
-  role: 'RESEARCHER',
+  role: 'USER',
   affiliation: 'Test University',
   isActive: true,
   isOwner: false,
@@ -54,8 +54,8 @@ export function renderApp(initialPath: string) {
 export function makeUser(role: Role, overrides: Partial<User> = {}): User {
   return {
     ...TEST_USER,
-    // RESEARCHER is TEST_USER (the default project owner); every other role gets its own stable id.
-    id: role === 'RESEARCHER' ? TEST_USER.id : `00000000-0000-4000-8000-0000000001${String(ROLES.indexOf(role)).padStart(2, '0')}`,
+    // USER is TEST_USER (the default project owner); every other role gets its own stable id.
+    id: role === 'USER' ? TEST_USER.id : `00000000-0000-4000-8000-0000000001${String(ROLES.indexOf(role)).padStart(2, '0')}`,
     email: `${role.toLowerCase()}@example.edu`,
     fullName: `Test ${role}`,
     role,
@@ -86,8 +86,8 @@ export function makeCollaborator(overrides: Partial<Collaborator> = {}): Collabo
     userId: TEST_USER.id,
     fullName: TEST_USER.fullName,
     email: TEST_USER.email,
-    userRole: 'RESEARCHER',
-    role: 'LEAD',
+    userRole: 'USER',
+    role: 'EDITOR',
     isOwner: true,
     addedAt: '2026-10-01T10:00:00.000Z',
     ...overrides,

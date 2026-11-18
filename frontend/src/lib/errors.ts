@@ -8,6 +8,8 @@ export type ErrorContext =
   | 'status'
   | 'collaborator-add'
   | 'collaborator-remove'
+  | 'collaborator-update'
+  | 'signup'
   | 'document-upload'
   | 'document-download'
   | 'user-save'
@@ -61,7 +63,7 @@ export function describeError(err: unknown, context: ErrorContext = 'load'): str
       break;
     case 'project-save':
       if (status === 400) return 'Revisa los campos marcados.';
-      if (status === 403) return 'No tienes permiso para editar este proyecto.';
+      if (status === 403) return 'Solo tienes permiso de lectura en este proyecto. Pide al dueño que te dé permiso de edición.';
       if (status === 404) return 'El proyecto ya no existe o no tienes acceso a él.';
       if (status === 409) return 'El proyecto ya no está en borrador, por lo que no se puede editar.';
       break;
@@ -71,14 +73,28 @@ export function describeError(err: unknown, context: ErrorContext = 'load'): str
       break;
     case 'collaborator-add':
       if (status === 400) return 'Revisa el correo y el rol.';
-      if (status === 403) return 'No tienes permiso para agregar colaboradores a este proyecto.';
+      if (status === 403) return 'Solo el dueño del proyecto puede agregar colaboradores.';
       // The server answers identically for unknown, inactive and wrong-role emails (no enumeration).
-      if (status === 404) return 'No se encontró un usuario elegible con ese correo. Debe ser un Investigador o Estudiante activo.';
-      if (status === 409) return 'Ese usuario ya es colaborador del proyecto (o es el dueño, que ya es líder).';
-      if (status === 422) return 'Solo usuarios con rol Investigador o Estudiante pueden ser colaboradores.';
+      if (status === 404) return 'No se encontró un usuario elegible con ese correo. Debe ser un Usuario activo de la plataforma.';
+      if (status === 409) return 'Ese usuario ya es colaborador del proyecto (o es el dueño, que ya tiene acceso completo).';
+      if (status === 422) return 'Solo los usuarios con rol Usuario pueden ser colaboradores.';
       break;
+    case 'collaborator-update':
+      if (status === 403) return 'Solo el dueño del proyecto puede cambiar los permisos.';
+      if (status === 404) return 'Ese colaborador ya no está en el proyecto.';
+      if (status === 409) return 'El dueño siempre tiene acceso completo.';
+      break;
+    case 'signup': {
+      const extra = body as { code?: string; domain?: string };
+      if (status === 409) return 'Ya existe una cuenta con ese correo electrónico. Inicia sesión.';
+      if (status === 422 && extra.code === 'EMAIL_DOMAIN_NOT_ALLOWED') {
+        return `El registro está limitado a correos @${extra.domain ?? 'institucionales'}.`;
+      }
+      if (status === 400) return 'Revisa los campos marcados.';
+      break;
+    }
     case 'collaborator-remove':
-      if (status === 403) return 'No tienes permiso para quitar colaboradores de este proyecto.';
+      if (status === 403) return 'Solo el dueño del proyecto puede quitar colaboradores.';
       if (status === 404) return 'Ese colaborador ya no está en el proyecto.';
       if (status === 409) return 'El dueño del proyecto no se puede quitar.';
       break;
@@ -90,7 +106,7 @@ export function describeError(err: unknown, context: ErrorContext = 'load'): str
       if (status === 400) {
         return `El servidor rechazó el archivo (por ejemplo, está vacío o la solicitud está mal formada).${serverDetail(err)}`;
       }
-      if (status === 403) return 'No tienes permiso para subir documentos a este proyecto.';
+      if (status === 403) return 'Solo tienes permiso de lectura en este proyecto: no puedes subir documentos.';
       if (status === 404) return 'El proyecto ya no existe o no tienes acceso a él.';
       if (status === 409) return UPLOAD_CLOSED;
       break;

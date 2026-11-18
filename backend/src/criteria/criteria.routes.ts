@@ -48,7 +48,7 @@ export const rubricRouter = Router();
 
 rubricRouter.get(
   '/:id/rubric',
-  ...authorize({ roles: ['ADMINISTRATOR', 'RESEARCHER', 'STUDENT', 'JUDGE'] }),
+  ...authorize({ roles: ['ADMINISTRATOR', 'USER', 'JUDGE'] }),
   asyncHandler(async (req, res) => {
     const { id } = projectIdParamSchema.parse(req.params);
     res.json(await getProjectRubric(id, req.user!));

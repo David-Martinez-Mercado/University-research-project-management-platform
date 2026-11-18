@@ -39,7 +39,7 @@ async function rubric() {
 /** Owner + project under evaluation + one assigned judge (+ optional second). */
 async function world(judges = 1) {
   const admin = await as('ADMINISTRATOR');
-  const owner = await as('RESEARCHER', 'UNIPOLI');
+  const owner = await as('USER', 'UNIPOLI');
   const project = await mkProject(owner.user.id);
   const js: Actor[] = [];
   for (let i = 0; i < judges; i++) {
@@ -206,8 +206,8 @@ describe('investors (BR-005, BR-007, FR-015, FR-016, FR-018)', () => {
 
 describe('milestones and progress (FR-017)', () => {
   it('team creates, completes and deletes milestones; progress is computed; blocked under evaluation', async () => {
-    const owner = await as('RESEARCHER', 'UNIPOLI');
-    const outsider = await as('RESEARCHER', 'Otra');
+    const owner = await as('USER', 'UNIPOLI');
+    const outsider = await as('USER', 'Otra');
     const project = await mkProject(owner.user.id, 'DRAFT');
 
     const a = await api().post(`/projects/${project.id}/milestones`).set(owner.h).send({ title: 'Revisión', dueDate: '2026-12-01' });
@@ -228,8 +228,8 @@ describe('milestones and progress (FR-017)', () => {
 
 describe('notifications (FR-019)', () => {
   it('are private to their owner, listable, and markable as read', async () => {
-    const me = await as('RESEARCHER');
-    const other = await as('STUDENT');
+    const me = await as('USER');
+    const other = await as('USER');
     const n1 = await prisma.notification.create({ data: { userId: me.user.id, title: 'A', message: 'a' } });
     await prisma.notification.create({ data: { userId: me.user.id, title: 'B', message: 'b' } });
     await prisma.notification.create({ data: { userId: other.user.id, title: 'C', message: 'c' } });
@@ -247,12 +247,12 @@ describe('notifications (FR-019)', () => {
 
   it('assigning a judge, adding a collaborator and submitting a project notify the right people', async () => {
     const admin = await as('ADMINISTRATOR');
-    const owner = await as('RESEARCHER', 'UNIPOLI');
-    const student = await as('STUDENT');
+    const owner = await as('USER', 'UNIPOLI');
+    const student = await as('USER');
     const judge = await as('JUDGE', 'Otra');
     const project = await mkProject(owner.user.id, 'DRAFT');
 
-    await api().post(`/projects/${project.id}/collaborators`).set(owner.h).send({ email: student.user.email, role: 'MEMBER' });
+    await api().post(`/projects/${project.id}/collaborators`).set(owner.h).send({ email: student.user.email, role: 'VIEWER' });
     expect(await prisma.notification.count({ where: { userId: student.user.id, type: 'COLLABORATOR_ADDED' } })).toBe(1);
 
     await api().put(`/projects/${project.id}/status`).set(owner.h).send({ status: 'SUBMITTED' });
@@ -284,7 +284,7 @@ describe('AI assistant (FR-007, FR-008, FR-028, AIR-003..005, AIR-007)', () => {
   });
 
   async function indexed() {
-    const owner = await as('RESEARCHER', 'UNIPOLI');
+    const owner = await as('USER', 'UNIPOLI');
     const project = await mkProject(owner.user.id, 'DRAFT');
     const doc = await makeDocument({
       storage,
@@ -311,7 +311,7 @@ describe('AI assistant (FR-007, FR-008, FR-028, AIR-003..005, AIR-007)', () => {
     expect(history.body.data).toHaveLength(1);
     expect(history.body.data[0].sources[0].fileName).toBe('sensores.txt');
 
-    const other = await as('RESEARCHER', 'Otra');
+    const other = await as('USER', 'Otra');
     expect((await api().post(`/ai/interactions/${res.body.interactionId}/flag`).set(other.h)).status).toBe(404);
     expect((await api().post(`/ai/interactions/${res.body.interactionId}/flag`).set(owner.h)).body.flagged).toBe(true);
 
@@ -346,7 +346,7 @@ describe('AI assistant (FR-007, FR-008, FR-028, AIR-003..005, AIR-007)', () => {
     expect(down.status).toBe(503);
     expect(down.body.code).toBe('AI_UNAVAILABLE');
 
-    const outsider = await as('RESEARCHER', 'Otra');
+    const outsider = await as('USER', 'Otra');
     expect((await api().post(`/projects/${project.id}/ask`).set(outsider.h).send({ question: 'sensores?' })).status).toBe(404);
     expect((await api().post(`/projects/${project.id}/ask`).set(owner.h).send({ question: 'a' })).status).toBe(400);
     expect((await api().post(`/projects/${project.id}/ask`).send({ question: 'hola mundo' })).status).toBe(401);

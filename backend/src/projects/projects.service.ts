@@ -33,9 +33,11 @@ export function toPublicProject(p: Project) {
 interface LoadedProject {
   project: Project;
   isOwner: boolean;
-  isLead: boolean;
+  isEditor: boolean;
   isAdmin: boolean;
-  /** Owner, LEAD collaborator or ADMINISTRATOR. */
+  /** Owner, EDITOR collaborator or ADMINISTRATOR: may change content, documents and progress. */
+  canEdit: boolean;
+  /** Owner or ADMINISTRATOR: submits the project and controls collaborators and their view/edit permission. */
   canManage: boolean;
 }
 
@@ -51,16 +53,23 @@ async function loadVisibleProject(id: string, user: AuthUser): Promise<LoadedPro
   if (!row) throw new HttpError(404, 'Project not found');
   const { collaborators, ...project } = row;
   const isOwner = project.ownerId === user.id;
-  const isLead = collaborators.some((c) => c.role === 'LEAD');
+  const isEditor = collaborators.some((c) => c.role === 'EDITOR');
   const isAdmin = user.role === 'ADMINISTRATOR';
-  return { project, isOwner, isLead, isAdmin, canManage: isOwner || isLead || isAdmin };
+  return { project, isOwner, isEditor, isAdmin, canEdit: isOwner || isEditor || isAdmin, canManage: isOwner || isAdmin };
 }
 
-/** Visible project the caller is allowed to manage; otherwise 404 (invisible) or 403 (visible). */
+/** Visible project the caller may edit (owner, EDITOR collaborator, admin); otherwise 404 (invisible) or 403 (view-only). */
+async function loadEditableProject(id: string, user: AuthUser): Promise<LoadedProject> {
+  const loaded = await loadVisibleProject(id, user);
+  if (!loaded.canEdit) throw new HttpError(403, 'You only have view access to this project');
+  return loaded;
+}
+
+/** Visible project the caller is allowed to manage (owner or admin); otherwise 404 (invisible) or 403 (visible). */
 async function loadManageableProject(id: string, user: AuthUser): Promise<LoadedProject> {
   const loaded = await loadVisibleProject(id, user);
   if (!loaded.canManage) {
-    throw new HttpError(403, 'Only the project owner, a lead collaborator or an administrator can do this');
+    throw new HttpError(403, 'Only the project owner or an administrator can do this');
   }
   return loaded;
 }
@@ -102,7 +111,7 @@ export async function getProject(id: string, user: AuthUser) {
 }
 
 export async function updateProject(id: string, patch: UpdateProjectInput, user: AuthUser) {
-  const { project, isAdmin } = await loadManageableProject(id, user);
+  const { project, isAdmin } = await loadEditableProject(id, user);
   if (!isAdmin && project.status !== 'DRAFT') {
     throw new HttpError(409, `Project is ${project.status}; only DRAFT projects can be edited`);
   }
@@ -192,7 +201,7 @@ async function notifyStatusChange(project: Project, from: ProjectStatus, to: Pro
 
 // ---- Collaborators -------------------------------------------------------------------------
 
-export const COLLABORATOR_ROLES = ['RESEARCHER', 'STUDENT'] as const;
+export const COLLABORATOR_ROLES = ['USER'] as const;
 
 interface CollaboratorView {
   userId: string;
@@ -215,13 +224,13 @@ export async function listCollaborators(projectId: string, user: AuthUser): Prom
     }),
   ]);
   return [
-    // The owner is implicitly LEAD and has no row in project_collaborators.
+    // The owner is implicitly an EDITOR and has no row in project_collaborators.
     {
       userId: owner.id,
       fullName: owner.fullName,
       email: owner.email,
       userRole: owner.role,
-      role: 'LEAD',
+      role: 'EDITOR',
       isOwner: true,
       addedAt: project.createdAt,
     },
@@ -251,7 +260,7 @@ export async function addCollaborator(projectId: string, input: AddCollaboratorI
     }
   } else {
     if (input.userId === project.ownerId) {
-      throw new HttpError(409, 'The project owner is already the lead and cannot be added as a collaborator');
+      throw new HttpError(409, 'The project owner already has full access and cannot be added as a collaborator');
     }
     target = await prisma.user.findUnique({ where: { id: input.userId } });
     if (!target || !target.isActive) throw new HttpError(404, 'User not found');
@@ -260,7 +269,7 @@ export async function addCollaborator(projectId: string, input: AddCollaboratorI
     }
   }
   if (target.id === project.ownerId) {
-    throw new HttpError(409, 'The project owner is already the lead and cannot be added as a collaborator');
+    throw new HttpError(409, 'The project owner already has full access and cannot be added as a collaborator');
   }
 
   try {
@@ -278,6 +287,21 @@ export async function addCollaborator(projectId: string, input: AddCollaboratorI
     type: 'COLLABORATOR_ADDED',
     title: 'Te agregaron a un proyecto',
     message: `Ahora colaboras en «${project.title}».`,
+  });
+  return listCollaborators(projectId, user);
+}
+
+/** The owner changes what a collaborator may do: EDITOR (view + edit) or VIEWER (read-only). */
+export async function updateCollaboratorRole(projectId: string, userId: string, role: CollaboratorRole, user: AuthUser) {
+  const { project } = await loadManageableProject(projectId, user);
+  if (userId === project.ownerId) throw new HttpError(409, 'The project owner always has full access');
+  const { count } = await prisma.projectCollaborator.updateMany({ where: { projectId, userId }, data: { role } });
+  if (count === 0) throw new HttpError(404, 'Collaborator not found');
+  await notifyUsers([userId], {
+    projectId,
+    type: 'COLLABORATOR_ADDED',
+    title: 'Cambió tu permiso en un proyecto',
+    message: `Ahora tienes permiso de ${role === 'EDITOR' ? 'edición' : 'solo lectura'} en «${project.title}».`,
   });
   return listCollaborators(projectId, user);
 }

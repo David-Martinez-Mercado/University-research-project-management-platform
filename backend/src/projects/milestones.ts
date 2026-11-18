@@ -7,8 +7,8 @@ import { authorize } from '../middleware/authorize';
 import type { AuthUser } from '../middleware/authenticate';
 import { visibleProjectsWhere } from './projects.scope';
 
-const ALL_ROLES = ['ADMINISTRATOR', 'RESEARCHER', 'STUDENT', 'JUDGE', 'INVESTOR'] as const;
-const TEAM_ROLES = ['ADMINISTRATOR', 'RESEARCHER', 'STUDENT'] as const;
+const ALL_ROLES = ['ADMINISTRATOR', 'USER', 'JUDGE', 'INVESTOR'] as const;
+const TEAM_ROLES = ['ADMINISTRATOR', 'USER'] as const;
 
 const dateOnly = z
   .string()
@@ -53,17 +53,18 @@ export function progressPercent(milestones: Array<{ completedAt: Date | null }>)
 async function loadVisible(projectId: string, user: AuthUser) {
   const project = await prisma.project.findFirst({
     where: { AND: [{ id: projectId }, visibleProjectsWhere(user)] },
-    select: { id: true, ownerId: true, status: true, collaborators: { where: { userId: user.id }, select: { userId: true } } },
+    select: { id: true, ownerId: true, status: true, collaborators: { where: { userId: user.id }, select: { role: true } } },
   });
   if (!project) throw new HttpError(404, 'Project not found');
   return project;
 }
 
-/** Only the team (owner, any collaborator) or an administrator may edit, and only until evaluation starts (FR-017). */
+/** Only the owner, an EDITOR collaborator or an administrator may edit, and only until evaluation starts (FR-017). */
 async function loadEditable(projectId: string, user: AuthUser) {
   const project = await loadVisible(projectId, user);
-  const isTeam = project.ownerId === user.id || project.collaborators.length > 0 || user.role === 'ADMINISTRATOR';
-  if (!isTeam) throw new HttpError(403, 'Only the project team can update progress');
+  const canEdit =
+    project.ownerId === user.id || project.collaborators.some((c) => c.role === 'EDITOR') || user.role === 'ADMINISTRATOR';
+  if (!canEdit) throw new HttpError(403, 'Only the project owner or an editor can update progress');
   if (!['DRAFT', 'SUBMITTED'].includes(project.status)) {
     throw new HttpError(409, 'Progress cannot be changed once the project is under evaluation', { status: project.status });
   }

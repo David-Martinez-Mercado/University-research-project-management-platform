@@ -6,7 +6,7 @@ import { listNotifications, markAllRead, markRead } from './notifications.servic
 
 export const notificationsRouter = Router();
 
-const ALL_ROLES = ['ADMINISTRATOR', 'RESEARCHER', 'STUDENT', 'JUDGE', 'INVESTOR'] as const;
+const ALL_ROLES = ['ADMINISTRATOR', 'USER', 'JUDGE', 'INVESTOR'] as const;
 
 const listQuery = z.object({
   unread: z

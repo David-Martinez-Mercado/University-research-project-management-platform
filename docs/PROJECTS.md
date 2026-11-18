@@ -80,3 +80,17 @@ El futuro dashboard de inversionistas debe reutilizar esta función. Las pruebas
 8. No hay `DELETE /projects/:id` (no estaba en el alcance; ARCHIVED hace de baja lógica).
 9. Paginación por `limit/offset` (no cursor), orden `createdAt desc, id desc`. `limit` mayor al tope se recorta a 100; `limit<1` o no numérico → 400.
 10. Un 403 por rol (p. ej. JUDGE en `PUT`) no revela existencia; para roles permitidos, el proyecto no visible siempre es 404.
+
+
+## Permisos de colaboradores (17 nov)
+
+El **dueño** (y el administrador) decide qué puede hacer cada colaborador: `EDITOR` (ver y editar) o `VIEWER` (solo lectura). Antes existían `LEAD`/`MEMBER`; los colaboradores existentes quedaron como `EDITOR`.
+
+| Acción | Dueño / admin | EDITOR | VIEWER |
+|---|---|---|---|
+| Ver proyecto, documentos, rúbrica, resultados | sí | sí | sí |
+| Editar datos (en `DRAFT`), subir documentos, hitos de avance | sí | sí | 403 |
+| Enviar a revisión / retirar (`PUT /status`) | sí | 403 | 403 |
+| Agregar, quitar y cambiar permisos (`/collaborators`) | sí | 403 | 403 |
+
+Cambiar permiso: `PUT /projects/:id/collaborators/:userId` con `{ "role": "EDITOR" | "VIEWER" }` (el dueño no se puede degradar; el colaborador recibe una notificación). Solo usuarios con rol `USER` pueden ser colaboradores.

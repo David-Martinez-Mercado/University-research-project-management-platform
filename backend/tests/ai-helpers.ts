@@ -40,7 +40,7 @@ export async function makeOwner() {
       email: `ai-${randomUUID()}@test.local`,
       passwordHash: 'not-a-real-hash',
       fullName: 'AI Test User',
-      role: 'RESEARCHER',
+      role: 'USER',
     },
   });
 }

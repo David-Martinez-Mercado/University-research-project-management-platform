@@ -14,6 +14,7 @@ import {
 } from '../test/helpers';
 
 const project0 = makeProject();
+const other = '33333333-3333-4333-8333-333333333333';
 const base = `/projects/${project0.id}`;
 
 function open(
@@ -36,8 +37,8 @@ function open(
 const tabNames = () => screen.getAllByRole('tab').map((t) => t.textContent);
 
 describe('project workspace: tabs', () => {
-  it('RESEARCHER sees the seven tabs with tablist semantics and moves with the arrow keys', async () => {
-    const owner = makeUser('RESEARCHER');
+  it('USER sees the seven tabs with tablist semantics and moves with the arrow keys', async () => {
+    const owner = makeUser('USER');
     open(owner, makeProject({ ownerId: owner.id }), [makeCollaborator({ userId: owner.id })]);
 
     expect(await screen.findByRole('tablist', { name: 'Secciones del proyecto' })).toBeInTheDocument();
@@ -70,7 +71,7 @@ describe('project workspace: tabs', () => {
   });
 
   it('Asistente IA, Progreso and Resultados load their real data (no placeholders)', async () => {
-    const owner = makeUser('RESEARCHER');
+    const owner = makeUser('USER');
     open(owner, makeProject({ ownerId: owner.id }), [makeCollaborator({ userId: owner.id })], {
       [`GET ${base}/ai-history`]: () => jsonResponse(200, { data: [] }),
       [`GET ${base}/milestones`]: () => jsonResponse(200, { data: [], progressPercent: 0 }),
@@ -109,7 +110,7 @@ describe('project workspace: tabs', () => {
   });
 
   it('shows a clear message when the project is not visible (404)', async () => {
-    signedInAs(makeUser('RESEARCHER'), {
+    signedInAs(makeUser('USER'), {
       [`GET ${base}`]: () => jsonResponse(404, { error: 'Project not found' }),
       [`GET ${base}/collaborators`]: () => jsonResponse(404, { error: 'Project not found' }),
     });
@@ -121,7 +122,7 @@ describe('project workspace: tabs', () => {
 });
 
 describe('project workspace: overview and status actions', () => {
-  const owner = makeUser('RESEARCHER');
+  const owner = makeUser('USER');
   const ownerRow = makeCollaborator({ userId: owner.id, fullName: owner.fullName });
 
   it('shows the project fields', async () => {
@@ -148,23 +149,24 @@ describe('project workspace: overview and status actions', () => {
     expect(screen.getByRole('button', { name: 'Editar proyecto' })).toBeInTheDocument();
   });
 
-  it('a MEMBER collaborator has no edit or status controls, a LEAD collaborator does', async () => {
-    const student = makeUser('STUDENT');
+  it('a VIEWER collaborator has no edit or status controls', async () => {
+    const student = makeUser('USER', { id: other });
     const draft = makeProject({ ownerId: owner.id });
-    open(student, draft, [ownerRow, makeCollaborator({ userId: student.id, fullName: student.fullName, role: 'MEMBER', isOwner: false })]);
+    open(student, draft, [ownerRow, makeCollaborator({ userId: student.id, fullName: student.fullName, role: 'VIEWER', isOwner: false })]);
     expect(await screen.findByText('Vista de solo lectura.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Editar proyecto' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Enviar a revisión' })).not.toBeInTheDocument();
   });
 
-  it('a LEAD collaborator (not the owner) can edit and submit', async () => {
-    const student = makeUser('STUDENT');
+  it('an EDITOR collaborator (not the owner) can edit but cannot submit: only the owner does', async () => {
+    const student = makeUser('USER', { id: other });
     open(student, makeProject({ ownerId: owner.id }), [
       ownerRow,
-      makeCollaborator({ userId: student.id, role: 'LEAD', isOwner: false }),
+      makeCollaborator({ userId: student.id, role: 'EDITOR', isOwner: false }),
     ]);
     expect(await screen.findByRole('button', { name: 'Editar proyecto' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Enviar a revisión' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Enviar a revisión' })).not.toBeInTheDocument();
+    expect(screen.getByText(/Solo el dueño lo envía a revisión/)).toBeInTheDocument();
   });
 
   it('submits for review: sends PUT /status and shows the new state', async () => {
@@ -258,10 +260,9 @@ describe('project workspace: overview and status actions', () => {
 });
 
 describe('project workspace: collaborators', () => {
-  const owner = makeUser('RESEARCHER');
+  const owner = makeUser('USER');
   const ownerRow = makeCollaborator({ userId: owner.id, fullName: owner.fullName });
-  const other = '33333333-3333-4333-8333-333333333333';
-  const otherRow = makeCollaborator({ userId: other, fullName: 'Sam Student', email: 'sam@example.edu', userRole: 'STUDENT', role: 'MEMBER', isOwner: false });
+  const otherRow = makeCollaborator({ userId: other, fullName: 'Sam Student', email: 'sam@example.edu', userRole: 'USER', role: 'VIEWER', isOwner: false });
   const draft = makeProject({ ownerId: owner.id });
 
   it('lists collaborators with role and owner marker', async () => {
@@ -271,10 +272,11 @@ describe('project workspace: collaborators', () => {
     const items = within(list).getAllByRole('listitem');
     expect(items).toHaveLength(2);
     expect(within(items[0]).getByText('Dueño')).toBeInTheDocument();
-    expect(within(items[0]).getByText('Líder')).toBeInTheDocument();
+    expect(within(items[0]).getByText('Acceso completo')).toBeInTheDocument();
     expect(within(items[0]).queryByRole('button')).not.toBeInTheDocument(); // the owner cannot be removed
     expect(within(items[1]).getByText('Sam Student')).toBeInTheDocument();
-    expect(within(items[1]).getByText('Miembro')).toBeInTheDocument();
+    // The owner sees a permission selector for each collaborator.
+    expect(within(items[1]).getByLabelText('Permiso de Sam Student')).toHaveValue('VIEWER');
     expect(within(items[1]).getByText(/sam@example.edu/)).toBeInTheDocument();
   });
 
@@ -292,20 +294,20 @@ describe('project workspace: collaborators', () => {
     const input = screen.getByLabelText('Correo del colaborador');
     await user.clear(input);
     await user.type(input, 'sam@example.edu');
-    await user.selectOptions(screen.getByLabelText('Rol en el proyecto'), 'LEAD');
+    await user.selectOptions(screen.getByLabelText('Permiso'), 'EDITOR');
     await user.click(screen.getByRole('button', { name: 'Agregar colaborador' }));
 
     expect(await screen.findByText('Sam Student')).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('Colaborador agregado.');
     const [, init] = callsTo(fetchMock, `POST ${base}/collaborators`)[0];
-    expect(JSON.parse(String(init?.body))).toEqual({ email: 'sam@example.edu', role: 'LEAD' });
+    expect(JSON.parse(String(init?.body))).toEqual({ email: 'sam@example.edu', role: 'EDITOR' });
   });
 
   it.each([
     [404, 'No se encontró un usuario elegible con ese correo.'],
     [409, 'Ese usuario ya es colaborador del proyecto'],
-    [422, 'Solo usuarios con rol Investigador o Estudiante pueden ser colaboradores.'],
-    [403, 'No tienes permiso para agregar colaboradores a este proyecto.'],
+    [422, 'Solo los usuarios con rol Usuario pueden ser colaboradores.'],
+    [403, 'Solo el dueño del proyecto puede agregar colaboradores.'],
   ])('maps the %s of adding a collaborator', async (status, message) => {
     open(owner, draft, [ownerRow], { [`POST ${base}/collaborators`]: () => jsonResponse(status, { error: 'x' }) }, '?tab=collaborators');
     const user = userEvent.setup();
@@ -340,8 +342,31 @@ describe('project workspace: collaborators', () => {
     expect(callsTo(fetchMock, `DELETE ${base}/collaborators/${other}`)).toHaveLength(0);
   });
 
-  it('a MEMBER can read the list but sees no add form and no remove buttons', async () => {
-    const student = makeUser('STUDENT', { id: other });
+  it('the owner changes a collaborator permission between view and edit (PUT)', async () => {
+    const fetchMock = open(owner, draft, [ownerRow, otherRow], {
+      [`PUT ${base}/collaborators/${other}`]: () => jsonResponse(200, { data: [ownerRow, { ...otherRow, role: 'EDITOR' }] }),
+    }, '?tab=collaborators');
+    const user = userEvent.setup();
+
+    const select = await screen.findByLabelText('Permiso de Sam Student');
+    expect(select).toHaveValue('VIEWER');
+    await user.selectOptions(select, 'EDITOR');
+
+    expect(await screen.findByText('Sam Student: puede editar.')).toBeInTheDocument();
+    expect(JSON.parse(String(callsTo(fetchMock, `PUT ${base}/collaborators/${other}`)[0][1]?.body))).toEqual({ role: 'EDITOR' });
+    expect(screen.getByLabelText('Permiso de Sam Student')).toHaveValue('EDITOR');
+  });
+
+  it('a collaborator cannot change permissions: sees the permission as text and an explanation', async () => {
+    const student = makeUser('USER', { id: other });
+    open(student, draft, [ownerRow, otherRow], {}, '?tab=collaborators');
+    expect(await screen.findByText(/permiso de solo lectura en este proyecto/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Permiso de Sam Student')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Solo lectura').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('a VIEWER can read the list but sees no add form and no remove buttons', async () => {
+    const student = makeUser('USER', { id: other });
     open(student, draft, [ownerRow, otherRow], {}, '?tab=collaborators');
 
     expect(await screen.findByText('Sam Student')).toBeInTheDocument();

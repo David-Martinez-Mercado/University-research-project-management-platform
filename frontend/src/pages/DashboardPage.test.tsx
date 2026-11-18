@@ -39,8 +39,8 @@ describe('role dashboards', () => {
     expect(filtered).toBeDefined();
   });
 
-  it('RESEARCHER: own projects, marked as owned, with the New project action', async () => {
-    const researcher = makeUser('RESEARCHER');
+  it('USER: own projects, marked as owned, with the New project action', async () => {
+    const researcher = makeUser('USER');
     signedInAs(researcher, {
       'GET /projects': () =>
         jsonResponse(200, page([
@@ -66,13 +66,13 @@ describe('role dashboards', () => {
     expect(screen.getAllByRole('link', { name: 'Nuevo proyecto' }).length).toBeGreaterThanOrEqual(2);
   });
 
-  it('STUDENT: my projects without any create action', async () => {
-    signedInAs(makeUser('STUDENT'), { 'GET /projects': () => jsonResponse(200, page([makeProject({ title: 'Colaboración' })])) });
+  it('USER (investigador / estudiante): my projects, with the create action', async () => {
+    signedInAs(makeUser('USER'), { 'GET /projects': () => jsonResponse(200, page([makeProject({ title: 'Colaboración' })])) });
     renderApp('/');
 
     expect(await screen.findByText('Colaboración')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Mis proyectos' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Nuevo proyecto' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Nuevo proyecto' }).length).toBeGreaterThanOrEqual(1);
   });
 
   it('JUDGE: assigned projects, read-only, with its own empty message', async () => {
@@ -139,7 +139,7 @@ describe('role dashboards', () => {
   it('shows a loading state, then an empty state for a researcher with no projects', async () => {
     let release!: () => void;
     const gate = new Promise<void>((resolve) => (release = resolve));
-    signedInAs(makeUser('RESEARCHER'), {
+    signedInAs(makeUser('USER'), {
       'GET /projects': async () => {
         await gate;
         return jsonResponse(200, page([]));
@@ -155,7 +155,7 @@ describe('role dashboards', () => {
 
   it('shows an error state with retry when the list fails', async () => {
     let calls = 0;
-    signedInAs(makeUser('RESEARCHER'), {
+    signedInAs(makeUser('USER'), {
       'GET /projects': () =>
         ++calls === 1 ? jsonResponse(500, { error: 'Internal server error' }) : jsonResponse(200, page([makeProject({ title: 'Recuperado' })])),
     });
@@ -167,7 +167,7 @@ describe('role dashboards', () => {
   });
 
   it('paginates with limit/offset', async () => {
-    const fetchMock = signedInAs(makeUser('RESEARCHER'), {
+    const fetchMock = signedInAs(makeUser('USER'), {
       'GET /projects': ({ url }) => {
         const offset = Number(url.searchParams.get('offset') ?? 0);
         return jsonResponse(200, page([makeProject({ id: `p${offset}`, title: offset ? 'Segunda página' : 'Primera página' })], 25, offset));

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { describeLoginError, type LoginFailure } from '../auth/loginErrors';
 import { Alert, BrandMark, Button, Icon, Input, type IconName } from '../components/ui';
@@ -114,7 +114,13 @@ export function LoginPage() {
             </Button>
           </form>
           <p className="mt-6 text-center text-sm text-slate-600">
-            ¿Necesitas una cuenta? Solicítala a un administrador.
+            ¿Eres investigador o estudiante y no tienes cuenta?{' '}
+            <Link to="/signup" className="font-medium text-brand-700 hover:underline">
+              Crear cuenta
+            </Link>
+          </p>
+          <p className="mt-2 text-center text-xs text-slate-500">
+            Los revisores (jueces y seguimiento de avances) reciben su usuario de un administrador.
           </p>
         </div>
       </main>

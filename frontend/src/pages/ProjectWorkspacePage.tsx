@@ -43,7 +43,7 @@ export function ProjectWorkspacePage() {
   const isTeamRole = !!user && PROJECT_TEAM_ROLES.includes(user.role);
   const project = useAsync(() => getProject(id), [id]);
   // Collaborators are loaded here (not in the tab) because Overview also needs them to know whether
-  // the caller is a LEAD. JUDGE and INVESTOR get 403 from this endpoint, so they never request it.
+  // the caller may edit. JUDGE and INVESTOR get 403 from this endpoint, so they never request it.
   const collaborators = useAsync(
     () => (isTeamRole ? listCollaborators(id) : Promise.resolve([])),
     [id, isTeamRole],
@@ -77,10 +77,10 @@ export function ProjectWorkspacePage() {
   } else if (!current) {
     body = <Spinner label="Cargando proyecto..." />;
   } else {
-    const canManage =
-      user.role === 'ADMINISTRATOR' ||
-      current.ownerId === user.id ||
-      !!collaborators.data?.some((c) => c.userId === user.id && c.role === 'LEAD');
+    // The owner (and an administrator) manage the project and its collaborators; an EDITOR collaborator may edit it.
+    const canManage = user.role === 'ADMINISTRATOR' || current.ownerId === user.id;
+    const canEdit =
+      canManage || !!collaborators.data?.some((c) => c.userId === user.id && c.role === 'EDITOR');
 
     const ctx: WorkspaceContext = {
       project: current,
@@ -88,6 +88,7 @@ export function ProjectWorkspacePage() {
       role: user.role,
       userId: user.id,
       canManage,
+      canEdit,
       collaborators: isTeamRole ? collaborators : null,
     };
 

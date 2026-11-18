@@ -22,7 +22,7 @@ const criterion = (over: Partial<Criterion> = {}): Criterion => ({
 
 describe('admin routes', () => {
   it('a non-admin who opens /admin/users is sent back to the dashboard', async () => {
-    signedInAs(makeUser('RESEARCHER'), { 'GET /projects': () => jsonResponse(200, page([])) });
+    signedInAs(makeUser('USER'), { 'GET /projects': () => jsonResponse(200, page([])) });
     renderApp('/admin/users');
     expect(await screen.findByRole('heading', { name: 'Mis proyectos' })).toBeInTheDocument();
   });
@@ -39,7 +39,7 @@ describe('admin routes', () => {
 
 describe('admin users', () => {
   it('lists users, searches, and creates one (duplicate email shows the backend conflict)', async () => {
-    const existing = makeUser('STUDENT', { fullName: 'Sara Student' });
+    const existing = makeUser('USER', { fullName: 'Sara Student' });
     let createStatus = 409;
     const fetchMock = signedInAs(admin, {
       'GET /users': () => jsonResponse(200, page([existing])),
@@ -79,7 +79,7 @@ describe('admin users', () => {
   });
 
   it('edits a user: sends only the changed contract fields, never the email', async () => {
-    const existing = makeUser('STUDENT', { id: '00000000-0000-4000-8000-0000000000aa', fullName: 'Sara Student' });
+    const existing = makeUser('USER', { id: '00000000-0000-4000-8000-0000000000aa', fullName: 'Sara Student' });
     const fetchMock = signedInAs(admin, {
       'GET /users': () => jsonResponse(200, page([existing])),
       [`PUT /users/${existing.id}`]: () => jsonResponse(200, { ...existing, isActive: false }),

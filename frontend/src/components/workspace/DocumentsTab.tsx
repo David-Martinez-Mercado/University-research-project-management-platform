@@ -25,12 +25,13 @@ function fileHint(file: File): string | null {
     : null;
 }
 
-export function DocumentsTab({ project, role }: WorkspaceContext) {
+export function DocumentsTab({ project, role, canEdit }: WorkspaceContext) {
   const docs = useAsync(() => listDocuments(project.id), [project.id]);
   const isTeam = PROJECT_TEAM_ROLES.includes(role);
   // The backend accepts uploads only while the project is DRAFT or SUBMITTED (it answers 409 otherwise).
   const uploadOpen = project.status === 'DRAFT' || project.status === 'SUBMITTED';
-  const canUpload = isTeam && uploadOpen;
+  // Only the owner, EDITOR collaborators and administrators upload; VIEWER collaborators read and download.
+  const canUpload = isTeam && canEdit && uploadOpen;
 
   const [file, setFile] = useState<File | null>(null);
   const [type, setType] = useState<DocumentType>('PROPOSAL');

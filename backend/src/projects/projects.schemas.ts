@@ -55,13 +55,15 @@ export const addCollaboratorSchema = z
   .object({
     userId: z.string().uuid().optional(),
     email: z.string().trim().toLowerCase().email().max(254).optional(),
-    role: z.nativeEnum(CollaboratorRole).default('MEMBER'),
+    role: z.nativeEnum(CollaboratorRole).default('EDITOR'),
   })
   .strict()
   .refine((v) => (v.userId === undefined) !== (v.email === undefined), {
     message: 'Provide exactly one of userId or email',
     path: ['userId'],
   });
+
+export const updateCollaboratorSchema = z.object({ role: z.nativeEnum(CollaboratorRole) }).strict();
 
 export const projectIdParamSchema = z.object({ id: z.string().uuid() });
 export const collaboratorParamsSchema = z.object({ id: z.string().uuid(), userId: z.string().uuid() });

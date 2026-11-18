@@ -8,12 +8,12 @@ afterAll(() => prisma.$disconnect());
 
 describe('POST /auth/login', () => {
   it('returns a JWT and the public user on valid credentials', async () => {
-    const u = await makeUser('RESEARCHER');
+    const u = await makeUser('USER');
     const res = await api().post('/auth/login').send({ email: u.email, password: PASSWORD });
     expect(res.status).toBe(200);
     expect(typeof res.body.token).toBe('string');
     expect(res.body.expiresInSeconds).toBe(30 * 60);
-    expect(res.body.user).toMatchObject({ id: u.id, email: u.email, role: 'RESEARCHER' });
+    expect(res.body.user).toMatchObject({ id: u.id, email: u.email, role: 'USER' });
     expect(JSON.stringify(res.body)).not.toContain('passwordHash');
     expect(JSON.stringify(res.body)).not.toContain('password_hash');
   });
@@ -25,7 +25,7 @@ describe('POST /auth/login', () => {
   });
 
   it('gives the same 401 for wrong password and unknown email', async () => {
-    const u = await makeUser('STUDENT');
+    const u = await makeUser('USER');
     const wrong = await api().post('/auth/login').send({ email: u.email, password: 'nope-nope-nope' });
     const unknown = await api().post('/auth/login').send({ email: 'ghost@test.local', password: 'nope-nope-nope' });
     expect(wrong.status).toBe(401);
@@ -34,7 +34,7 @@ describe('POST /auth/login', () => {
   });
 
   it('rejects a deactivated account even with the right password', async () => {
-    const u = await makeUser('STUDENT', { isActive: false });
+    const u = await makeUser('USER', { isActive: false });
     const res = await api().post('/auth/login').send({ email: u.email, password: PASSWORD });
     expect(res.status).toBe(401);
   });
@@ -155,11 +155,68 @@ describe('POST /auth/bootstrap-owner', () => {
 
 describe('GET /auth/me', () => {
   it('returns the caller and requires a token', async () => {
-    const u = await makeUser('STUDENT');
+    const u = await makeUser('USER');
     const { token } = await loginAs(u.email);
     const res = await api().get('/auth/me').set(bearer(token));
     expect(res.status).toBe(200);
     expect(res.body.id).toBe(u.id);
     expect((await api().get('/auth/me')).status).toBe(401);
+  });
+});
+
+describe('POST /auth/register (self-signup)', () => {
+  const body = (over: Record<string, unknown> = {}) => ({
+    email: 'nuevo@unipolidgo.edu.mx',
+    password: 'una-clave-larga-1',
+    fullName: 'Nora Nueva',
+    ...over,
+  });
+
+  it('creates a USER, signs them in, and never returns the password', async () => {
+    const res = await api().post('/auth/register').send(body({ affiliation: 'UNIPOLI' }));
+    expect(res.status).toBe(201);
+    expect(res.body.user).toMatchObject({ email: 'nuevo@unipolidgo.edu.mx', role: 'USER', affiliation: 'UNIPOLI', isOwner: false });
+    expect(JSON.stringify(res.body)).not.toMatch(/password/i);
+    expect((await api().get('/auth/me').set(bearer(res.body.token))).body.role).toBe('USER');
+    expect((await api().post('/auth/login').send({ email: 'nuevo@unipolidgo.edu.mx', password: 'una-clave-larga-1' })).status).toBe(200);
+  });
+
+  it('cannot be used to obtain a privileged role (the key is rejected, not ignored)', async () => {
+    for (const role of ['ADMINISTRATOR', 'JUDGE', 'INVESTOR', 'USER']) {
+      expect((await api().post('/auth/register').send(body({ role }))).status).toBe(400);
+    }
+    expect((await api().post('/auth/register').send(body({ isOwner: true }))).status).toBe(400);
+    expect(await prisma.user.count()).toBe(0);
+  });
+
+  it('rejects duplicates (409), short passwords and bad emails (400)', async () => {
+    expect((await api().post('/auth/register').send(body())).status).toBe(201);
+    expect((await api().post('/auth/register').send(body({ email: 'NUEVO@unipolidgo.edu.mx' }))).status).toBe(409);
+    expect((await api().post('/auth/register').send(body({ email: 'otro@x.mx', password: 'corta' }))).status).toBe(400);
+    expect((await api().post('/auth/register').send(body({ email: 'no-es-correo' }))).status).toBe(400);
+    expect((await api().post('/auth/register').send(body({ email: 'b@x.mx', fullName: '   ' }))).status).toBe(400);
+  });
+
+  it('can be limited to an institutional domain (CON-001)', async () => {
+    env.SIGNUP_EMAIL_DOMAIN = 'unipolidgo.edu.mx';
+    try {
+      const bad = await api().post('/auth/register').send(body({ email: 'x@gmail.com' }));
+      expect(bad.status).toBe(422);
+      expect(bad.body.code).toBe('EMAIL_DOMAIN_NOT_ALLOWED');
+      expect((await api().post('/auth/register').send(body())).status).toBe(201);
+    } finally {
+      env.SIGNUP_EMAIL_DOMAIN = undefined;
+    }
+  });
+
+  it('reviewers (JUDGE / INVESTOR) can only be created by an administrator', async () => {
+    const user = await makeUser('USER');
+    const admin = await makeUser('ADMINISTRATOR');
+    const payload = { email: 'revisor@test.local', password: 'una-clave-larga-1', fullName: 'Rev', role: 'JUDGE' };
+    expect((await api().post('/users').send(payload)).status).toBe(401);
+    expect((await api().post('/users').set(bearer((await loginAs(user.email)).token)).send(payload)).status).toBe(403);
+    const ok = await api().post('/users').set(bearer((await loginAs(admin.email)).token)).send(payload);
+    expect(ok.status).toBe(201);
+    expect(ok.body.role).toBe('JUDGE');
   });
 });

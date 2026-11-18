@@ -33,6 +33,19 @@ async function registerFailedAttempt(userId: string, now: Date): Promise<void> {
     WHERE id = ${userId}::uuid`;
 }
 
+/** Public signup (FR-021): creates a USER account and signs it in. Never accepts a role. */
+export async function register(input: { email: string; password: string; fullName: string; affiliation?: string }) {
+  if (env.SIGNUP_EMAIL_DOMAIN && !input.email.endsWith(`@${env.SIGNUP_EMAIL_DOMAIN}`)) {
+    throw new HttpError(422, `Registration is limited to @${env.SIGNUP_EMAIL_DOMAIN} email addresses`, {
+      code: 'EMAIL_DOMAIN_NOT_ALLOWED',
+      domain: env.SIGNUP_EMAIL_DOMAIN,
+    });
+  }
+  const user = await createUser({ ...input, role: 'USER' });
+  const { token, expiresInSeconds } = signAccessToken(user.id);
+  return { token, expiresInSeconds, user };
+}
+
 export async function login(email: string, password: string) {
   const now = new Date();
   const user = await prisma.user.findUnique({ where: { email } });

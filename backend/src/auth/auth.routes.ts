@@ -3,8 +3,8 @@ import { asyncHandler } from '../middleware/asyncHandler';
 import { authenticate } from '../middleware/authenticate';
 import { ipRateLimit } from '../middleware/rateLimit';
 import { getUser } from '../users/users.service';
-import { bootstrapOwnerSchema, loginSchema } from './auth.schemas';
-import { bootstrapOwner, login } from './auth.service';
+import { bootstrapOwnerSchema, loginSchema, registerSchema } from './auth.schemas';
+import { bootstrapOwner, login, register } from './auth.service';
 
 export const authRouter = Router();
 
@@ -14,6 +14,14 @@ authRouter.post(
   asyncHandler(async (req, res) => {
     const { email, password } = loginSchema.parse(req.body);
     res.json(await login(email, password));
+  }),
+);
+
+authRouter.post(
+  '/register',
+  ipRateLimit(10, 15),
+  asyncHandler(async (req, res) => {
+    res.status(201).json(await register(registerSchema.parse(req.body)));
   }),
 );
 

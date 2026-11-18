@@ -55,8 +55,8 @@ describe('authentication on every project endpoint', () => {
 });
 
 describe('POST /projects', () => {
-  it('lets RESEARCHER and ADMINISTRATOR create; owner = caller, affiliation defaults from creator', async () => {
-    const researcher = await as('RESEARCHER');
+  it('lets USER and ADMINISTRATOR create; owner = caller, affiliation defaults from creator', async () => {
+    const researcher = await as('USER');
     await prisma.user.update({ where: { id: researcher.user.id }, data: { affiliation: 'UniPoli' } });
     const res = await api().post('/projects').set(researcher.h).send({ title: '  My project  ' });
     expect(res.status).toBe(201);
@@ -74,7 +74,7 @@ describe('POST /projects', () => {
     expect(res2.body).toMatchObject({ ownerId: admin.user.id, affiliation: 'Elsewhere' });
   });
 
-  it.each(['STUDENT', 'JUDGE', 'INVESTOR'] as const)('forbids %s (403) and creates nothing', async (role) => {
+  it.each(['JUDGE', 'INVESTOR'] as const)('forbids %s (403) and creates nothing', async (role) => {
     const a = await as(role);
     const res = await api().post('/projects').set(a.h).send({ title: 'Nope' });
     expect(res.status).toBe(403);
@@ -82,8 +82,8 @@ describe('POST /projects', () => {
   });
 
   it('validates input and never trusts ownerId / status from the body', async () => {
-    const r = await as('RESEARCHER');
-    const other = await makeUser('RESEARCHER');
+    const r = await as('USER');
+    const other = await makeUser('USER');
     const bad = [
       {},
       { title: '' },
@@ -104,11 +104,11 @@ describe('POST /projects', () => {
 describe('read scoping (enforced in the database query)', () => {
   async function world() {
     const admin = await as('ADMINISTRATOR');
-    const owner = await as('RESEARCHER');
-    const collab = await as('RESEARCHER');
-    const student = await as('STUDENT');
-    const stranger = await as('RESEARCHER');
-    const strangerStudent = await as('STUDENT');
+    const owner = await as('USER');
+    const collab = await as('USER');
+    const student = await as('USER');
+    const stranger = await as('USER');
+    const strangerStudent = await as('USER');
     const judge = await as('JUDGE');
     const judgeNoAssignment = await as('JUDGE');
     const investor = await as('INVESTOR');
@@ -118,8 +118,8 @@ describe('read scoping (enforced in the database query)', () => {
     const p2 = await mkProject(owner.user.id, { title: 'P2 owned only' });
     const p3 = await mkProject(stranger.user.id, { title: 'P3 stranger' });
 
-    await prisma.projectCollaborator.create({ data: { projectId: p1.id, userId: collab.user.id, role: 'MEMBER' } });
-    await prisma.projectCollaborator.create({ data: { projectId: p1.id, userId: student.user.id, role: 'MEMBER' } });
+    await prisma.projectCollaborator.create({ data: { projectId: p1.id, userId: collab.user.id, role: 'VIEWER' } });
+    await prisma.projectCollaborator.create({ data: { projectId: p1.id, userId: student.user.id, role: 'VIEWER' } });
     await prisma.judgeAssignment.create({
       data: { projectId: p1.id, judgeId: judge.user.id, assignedById: admin.user.id },
     });
@@ -139,14 +139,14 @@ describe('read scoping (enforced in the database query)', () => {
     expect(titles(res)).toEqual(['P1 owned+shared', 'P2 owned only', 'P3 stranger']);
   });
 
-  it('RESEARCHER: owner sees owned, collaborator sees shared, stranger sees only theirs', async () => {
+  it('USER: owner sees owned, collaborator sees shared, stranger sees only theirs', async () => {
     const w = await world();
     expect(titles(await api().get('/projects').set(w.owner.h))).toEqual(['P1 owned+shared', 'P2 owned only']);
     expect(titles(await api().get('/projects').set(w.collab.h))).toEqual(['P1 owned+shared']);
     expect(titles(await api().get('/projects').set(w.stranger.h))).toEqual(['P3 stranger']);
   });
 
-  it('STUDENT sees only projects they collaborate on', async () => {
+  it('USER sees only projects they collaborate on', async () => {
     const w = await world();
     expect(titles(await api().get('/projects').set(w.student.h))).toEqual(['P1 owned+shared']);
     const none = await api().get('/projects').set(w.strangerStudent.h);
@@ -205,7 +205,7 @@ describe('read scoping (enforced in the database query)', () => {
 
   it('supports status filter, limit cap and offset pagination', async () => {
     const admin = await as('ADMINISTRATOR');
-    const r = await as('RESEARCHER');
+    const r = await as('USER');
     for (let i = 0; i < 5; i++) await mkProject(r.user.id, { title: `D${i}` });
     await mkProject(r.user.id, { title: 'S0', status: 'SUBMITTED' });
 
@@ -226,7 +226,7 @@ describe('read scoping (enforced in the database query)', () => {
     expect(capped.body.limit).toBe(100);
 
     // Filter is combined with (not replacing) scoping.
-    const other = await as('RESEARCHER');
+    const other = await as('USER');
     expect((await api().get('/projects?status=SUBMITTED').set(other.h)).body.total).toBe(0);
 
     for (const q of ['status=BOGUS', 'limit=0', 'limit=abc', 'offset=-1']) {
@@ -237,7 +237,7 @@ describe('read scoping (enforced in the database query)', () => {
 
 describe('PUT /projects/:id', () => {
   it('owner edits a DRAFT; unspecified fields are untouched', async () => {
-    const owner = await as('RESEARCHER');
+    const owner = await as('USER');
     const p = await mkProject(owner.user.id);
     const res = await api().put(`/projects/${p.id}`).set(owner.h).send({ title: 'Renamed', summary: 'S' });
     expect(res.status).toBe(200);
@@ -247,13 +247,13 @@ describe('PUT /projects/:id', () => {
   });
 
   it('a LEAD collaborator may edit; a MEMBER may not (403); a stranger gets 404', async () => {
-    const owner = await as('RESEARCHER');
-    const lead = await as('STUDENT');
-    const member = await as('RESEARCHER');
-    const stranger = await as('RESEARCHER');
+    const owner = await as('USER');
+    const lead = await as('USER');
+    const member = await as('USER');
+    const stranger = await as('USER');
     const p = await mkProject(owner.user.id);
-    await prisma.projectCollaborator.create({ data: { projectId: p.id, userId: lead.user.id, role: 'LEAD' } });
-    await prisma.projectCollaborator.create({ data: { projectId: p.id, userId: member.user.id, role: 'MEMBER' } });
+    await prisma.projectCollaborator.create({ data: { projectId: p.id, userId: lead.user.id, role: 'EDITOR' } });
+    await prisma.projectCollaborator.create({ data: { projectId: p.id, userId: member.user.id, role: 'VIEWER' } });
 
     expect((await api().put(`/projects/${p.id}`).set(lead.h).send({ title: 'By lead' })).status).toBe(200);
     expect((await api().put(`/projects/${p.id}`).set(member.h).send({ title: 'By member' })).status).toBe(403);
@@ -262,7 +262,7 @@ describe('PUT /projects/:id', () => {
   });
 
   it('JUDGE and INVESTOR are rejected by role (403) even for their visible project', async () => {
-    const owner = await as('RESEARCHER');
+    const owner = await as('USER');
     const admin = await as('ADMINISTRATOR');
     const judge = await as('JUDGE');
     const investor = await as('INVESTOR');
@@ -276,7 +276,7 @@ describe('PUT /projects/:id', () => {
   });
 
   it('is blocked (409) once the project leaves DRAFT, for owner and lead; ADMINISTRATOR may still edit', async () => {
-    const owner = await as('RESEARCHER');
+    const owner = await as('USER');
     const admin = await as('ADMINISTRATOR');
     for (const status of ALL_STATUSES.filter((s) => s !== 'DRAFT')) {
       const p = await mkProject(owner.user.id, { status });
@@ -290,8 +290,8 @@ describe('PUT /projects/:id', () => {
   });
 
   it('validates input; ownerId / status / unknown keys are rejected', async () => {
-    const owner = await as('RESEARCHER');
-    const other = await makeUser('RESEARCHER');
+    const owner = await as('USER');
+    const other = await makeUser('USER');
     const p = await mkProject(owner.user.id);
     const bad = [{}, { title: '' }, { title: null }, { ownerId: other.id }, { status: 'EVALUATED' }, { foo: 'bar' }, { title: 'x'.repeat(301) }];
     for (const body of bad) expect((await api().put(`/projects/${p.id}`).set(owner.h).send(body)).status).toBe(400);
@@ -300,7 +300,7 @@ describe('PUT /projects/:id', () => {
   });
 
   it('404 for a non-existent project', async () => {
-    const owner = await as('RESEARCHER');
+    const owner = await as('USER');
     expect((await api().put(`/projects/${randomUUID()}`).set(owner.h).send({ title: 'x' })).status).toBe(404);
   });
 });
@@ -318,7 +318,7 @@ describe('PUT /projects/:id/status (lifecycle)', () => {
   });
 
   it('walks the whole happy path, setting and clearing submittedAt', async () => {
-    const owner = await as('RESEARCHER');
+    const owner = await as('USER');
     const admin = await as('ADMINISTRATOR');
     const p = await mkProject(owner.user.id);
 
@@ -342,7 +342,7 @@ describe('PUT /projects/:id/status (lifecycle)', () => {
   });
 
   it('an administrator may also submit/withdraw (MANAGER transitions)', async () => {
-    const owner = await as('RESEARCHER');
+    const owner = await as('USER');
     const admin = await as('ADMINISTRATOR');
     const p = await mkProject(owner.user.id);
     expect((await putStatus(admin, p.id, 'SUBMITTED')).status).toBe(200);
@@ -350,7 +350,7 @@ describe('PUT /projects/:id/status (lifecycle)', () => {
   });
 
   it('rejects EVERY transition that is not in the table with 409 and leaves the status unchanged', async () => {
-    const owner = await as('RESEARCHER');
+    const owner = await as('USER');
     const admin = await as('ADMINISTRATOR');
     const valid = new Set(TRANSITIONS.map((t) => `${t.from}>${t.to}`));
     let rejected = 0;
@@ -371,7 +371,7 @@ describe('PUT /projects/:id/status (lifecycle)', () => {
   });
 
   it('the owner cannot perform administrator-only transitions (403)', async () => {
-    const owner = await as('RESEARCHER');
+    const owner = await as('USER');
     const steps: [ProjectStatus, ProjectStatus][] = [
       ['SUBMITTED', 'UNDER_EVALUATION'],
       ['UNDER_EVALUATION', 'EVALUATED'],
@@ -384,19 +384,19 @@ describe('PUT /projects/:id/status (lifecycle)', () => {
     }
   });
 
-  it('a non-owner cannot submit: stranger 404, MEMBER 403, STUDENT-role 403 by membership; LEAD can', async () => {
-    const owner = await as('RESEARCHER');
-    const stranger = await as('RESEARCHER');
-    const member = await as('RESEARCHER');
-    const student = await as('STUDENT');
-    const strangerStudent = await as('STUDENT');
-    const lead = await as('STUDENT');
+  it('only the owner submits: stranger 404, VIEWER and EDITOR collaborators 403 (BR-004)', async () => {
+    const owner = await as('USER');
+    const stranger = await as('USER');
+    const member = await as('USER');
+    const student = await as('USER');
+    const strangerStudent = await as('USER');
+    const lead = await as('USER');
     const p = await mkProject(owner.user.id);
     await prisma.projectCollaborator.createMany({
       data: [
-        { projectId: p.id, userId: member.user.id, role: 'MEMBER' },
-        { projectId: p.id, userId: student.user.id, role: 'MEMBER' },
-        { projectId: p.id, userId: lead.user.id, role: 'LEAD' },
+        { projectId: p.id, userId: member.user.id, role: 'VIEWER' },
+        { projectId: p.id, userId: student.user.id, role: 'VIEWER' },
+        { projectId: p.id, userId: lead.user.id, role: 'EDITOR' },
       ],
     });
     expect((await putStatus(stranger, p.id, 'SUBMITTED')).status).toBe(404);
@@ -404,11 +404,12 @@ describe('PUT /projects/:id/status (lifecycle)', () => {
     expect((await putStatus(member, p.id, 'SUBMITTED')).status).toBe(403);
     expect((await putStatus(student, p.id, 'SUBMITTED')).status).toBe(403);
     expect((await prisma.project.findUniqueOrThrow({ where: { id: p.id } })).status).toBe('DRAFT');
-    expect((await putStatus(lead, p.id, 'SUBMITTED')).status).toBe(200);
+    expect((await putStatus(lead, p.id, 'SUBMITTED')).status).toBe(403); // an EDITOR edits, but only the owner submits
+    expect((await putStatus(owner, p.id, 'SUBMITTED')).status).toBe(200);
   });
 
   it('requires title and description before DRAFT -> SUBMITTED (422)', async () => {
-    const owner = await as('RESEARCHER');
+    const owner = await as('USER');
     const noDesc = await mkProject(owner.user.id, { description: null });
     const blankDesc = await mkProject(owner.user.id, { description: '   ' });
     for (const p of [noDesc, blankDesc]) {
@@ -422,8 +423,8 @@ describe('PUT /projects/:id/status (lifecycle)', () => {
   });
 
   it('validates the body (400) and hides invisible projects (404)', async () => {
-    const owner = await as('RESEARCHER');
-    const stranger = await as('RESEARCHER');
+    const owner = await as('USER');
+    const stranger = await as('USER');
     const p = await mkProject(owner.user.id);
     for (const body of [{}, { status: 'submitted' }, { status: 'DONE' }, { status: 5 }, { status: 'SUBMITTED', ownerId: stranger.user.id }]) {
       expect((await api().put(`/projects/${p.id}/status`).set(owner.h).send(body)).status).toBe(400);
@@ -433,7 +434,7 @@ describe('PUT /projects/:id/status (lifecycle)', () => {
   });
 
   it('two concurrent identical transitions: exactly one wins', async () => {
-    const owner = await as('RESEARCHER');
+    const owner = await as('USER');
     const admin = await as('ADMINISTRATOR');
     const p = await mkProject(owner.user.id, { status: 'SUBMITTED' });
     const results = await Promise.all([putStatus(admin, p.id, 'UNDER_EVALUATION'), putStatus(admin, p.id, 'UNDER_EVALUATION')]);
@@ -442,30 +443,31 @@ describe('PUT /projects/:id/status (lifecycle)', () => {
 });
 
 describe('collaborators', () => {
-  it('owner adds RESEARCHER and STUDENT collaborators; list includes the implicit LEAD owner', async () => {
-    const owner = await as('RESEARCHER');
-    const colleague = await as('RESEARCHER');
-    const student = await as('STUDENT');
+  it('owner adds collaborators (EDITOR by default); list includes the implicit owner', async () => {
+    const owner = await as('USER');
+    const colleague = await as('USER');
+    const student = await as('USER');
     const p = await mkProject(owner.user.id);
 
-    const r1 = await api().post(`/projects/${p.id}/collaborators`).set(owner.h).send({ userId: colleague.user.id, role: 'LEAD' });
+    const r1 = await api().post(`/projects/${p.id}/collaborators`).set(owner.h).send({ userId: colleague.user.id, role: 'EDITOR' });
     expect(r1.status).toBe(201);
-    const r2 = await api().post(`/projects/${p.id}/collaborators`).set(owner.h).send({ userId: student.user.id });
+    const r2 = await api().post(`/projects/${p.id}/collaborators`).set(owner.h).send({ userId: student.user.id, role: 'VIEWER' });
     expect(r2.status).toBe(201);
+    expect(r1.body.data.find((c: { userId: string }) => c.userId === colleague.user.id)).toMatchObject({ role: 'EDITOR' });
 
     const list = await api().get(`/projects/${p.id}/collaborators`).set(owner.h);
     expect(list.status).toBe(200);
     expect(list.body.data).toHaveLength(3);
-    expect(list.body.data[0]).toMatchObject({ userId: owner.user.id, role: 'LEAD', isOwner: true });
-    expect(list.body.data.find((c: { userId: string }) => c.userId === student.user.id)).toMatchObject({ role: 'MEMBER', isOwner: false });
+    expect(list.body.data[0]).toMatchObject({ userId: owner.user.id, role: 'EDITOR', isOwner: true });
+    expect(list.body.data.find((c: { userId: string }) => c.userId === student.user.id)).toMatchObject({ role: 'VIEWER', isOwner: false });
     expect(JSON.stringify(list.body)).not.toMatch(/password/i);
 
     // Collaborators can read the list too.
     expect((await api().get(`/projects/${p.id}/collaborators`).set(student.h)).status).toBe(200);
   });
 
-  it('only RESEARCHER/STUDENT users can be collaborators (422); owner 409; duplicate 409; unknown/inactive 404', async () => {
-    const owner = await as('RESEARCHER');
+  it('only USER/USER users can be collaborators (422); owner 409; duplicate 409; unknown/inactive 404', async () => {
+    const owner = await as('USER');
     const p = await mkProject(owner.user.id);
     const add = (userId: string) => api().post(`/projects/${p.id}/collaborators`).set(owner.h).send({ userId });
 
@@ -473,36 +475,36 @@ describe('collaborators', () => {
       expect((await add((await makeUser(role)).id)).status).toBe(422);
     }
     expect((await add(owner.user.id)).status).toBe(409);
-    const ok = await makeUser('STUDENT');
+    const ok = await makeUser('USER');
     expect((await add(ok.id)).status).toBe(201);
     expect((await add(ok.id)).status).toBe(409);
     expect((await add(randomUUID())).status).toBe(404);
-    const inactive = await makeUser('STUDENT', { isActive: false });
+    const inactive = await makeUser('USER', { isActive: false });
     expect((await add(inactive.id)).status).toBe(404);
     expect(await prisma.projectCollaborator.count({ where: { projectId: p.id } })).toBe(1);
   });
 
   describe('adding by email', () => {
     it('adds an eligible user by email (case-insensitive) and returns the updated list', async () => {
-      const owner = await as('RESEARCHER');
+      const owner = await as('USER');
       // The API always stores emails lowercased; the request may use any case / surrounding spaces.
-      const student = await makeUser('STUDENT', { email: 'ana.student@test.local' });
+      const student = await makeUser('USER', { email: 'ana.student@test.local' });
       const p = await mkProject(owner.user.id);
       const res = await api()
         .post(`/projects/${p.id}/collaborators`)
         .set(owner.h)
-        .send({ email: '  ANA.student@test.LOCAL ', role: 'LEAD' });
+        .send({ email: '  ANA.student@test.LOCAL ', role: 'EDITOR' });
       expect(res.status).toBe(201);
       const added = res.body.data.find((c: { userId: string }) => c.userId === student.id);
-      expect(added).toMatchObject({ role: 'LEAD', isOwner: false });
+      expect(added).toMatchObject({ role: 'EDITOR', isOwner: false });
       expect(await prisma.projectCollaborator.count({ where: { projectId: p.id } })).toBe(1);
     });
 
     it('answers unknown, inactive and non-collaborator-role emails identically (404, no enumeration)', async () => {
-      const owner = await as('RESEARCHER');
+      const owner = await as('USER');
       const p = await mkProject(owner.user.id);
       const judge = await makeUser('JUDGE');
-      const inactive = await makeUser('STUDENT', { isActive: false });
+      const inactive = await makeUser('USER', { isActive: false });
       const admin = await makeUser('ADMINISTRATOR');
       const bodies = [judge.email, inactive.email, admin.email, 'nobody@test.local'].map((email) =>
         api().post(`/projects/${p.id}/collaborators`).set(owner.h).send({ email }),
@@ -514,8 +516,8 @@ describe('collaborators', () => {
     });
 
     it('rejects the owner (409) and duplicates (409) by email too', async () => {
-      const owner = await as('RESEARCHER');
-      const s = await makeUser('STUDENT');
+      const owner = await as('USER');
+      const s = await makeUser('USER');
       const p = await mkProject(owner.user.id);
       const add = (email: string) => api().post(`/projects/${p.id}/collaborators`).set(owner.h).send({ email });
       expect((await add(owner.user.email)).status).toBe(409);
@@ -524,8 +526,8 @@ describe('collaborators', () => {
     });
 
     it('requires exactly one of userId / email, and a valid email (400)', async () => {
-      const owner = await as('RESEARCHER');
-      const s = await makeUser('STUDENT');
+      const owner = await as('USER');
+      const s = await makeUser('USER');
       const p = await mkProject(owner.user.id);
       for (const body of [{ userId: s.id, email: s.email }, { email: 'not-an-email' }, { email: '' }]) {
         expect((await api().post(`/projects/${p.id}/collaborators`).set(owner.h).send(body)).status).toBe(400);
@@ -533,10 +535,10 @@ describe('collaborators', () => {
     });
 
     it('keeps the existing permission rules: a plain collaborator or stranger cannot add by email', async () => {
-      const owner = await as('RESEARCHER');
-      const member = await as('STUDENT');
-      const stranger = await as('RESEARCHER');
-      const target = await makeUser('STUDENT');
+      const owner = await as('USER');
+      const member = await as('USER');
+      const stranger = await as('USER');
+      const target = await makeUser('USER');
       const p = await mkProject(owner.user.id);
       await api().post(`/projects/${p.id}/collaborators`).set(owner.h).send({ userId: member.user.id });
       const byMember = await api().post(`/projects/${p.id}/collaborators`).set(member.h).send({ email: target.email });
@@ -547,29 +549,29 @@ describe('collaborators', () => {
   });
 
   it('validates the body (400)', async () => {
-    const owner = await as('RESEARCHER');
-    const s = await makeUser('STUDENT');
+    const owner = await as('USER');
+    const s = await makeUser('USER');
     const p = await mkProject(owner.user.id);
     for (const body of [{}, { userId: 'nope' }, { userId: s.id, role: 'BOSS' }, { userId: s.id, projectId: randomUUID() }]) {
       expect((await api().post(`/projects/${p.id}/collaborators`).set(owner.h).send(body)).status).toBe(400);
     }
   });
 
-  it('RBAC: MEMBER 403, LEAD ok, stranger 404, JUDGE/INVESTOR 403, ADMINISTRATOR ok', async () => {
-    const owner = await as('RESEARCHER');
-    const member = await as('STUDENT');
-    const lead = await as('RESEARCHER');
-    const stranger = await as('RESEARCHER');
+  it('RBAC: only the owner and admins manage collaborators (VIEWER/EDITOR 403, stranger 404, JUDGE/INVESTOR 403)', async () => {
+    const owner = await as('USER');
+    const member = await as('USER');
+    const lead = await as('USER');
+    const stranger = await as('USER');
     const judge = await as('JUDGE');
     const investor = await as('INVESTOR');
     const admin = await as('ADMINISTRATOR');
-    const target = await makeUser('STUDENT');
-    const target2 = await makeUser('STUDENT');
+    const target = await makeUser('USER');
+    const target2 = await makeUser('USER');
     const p = await mkProject(owner.user.id);
     await prisma.projectCollaborator.createMany({
       data: [
-        { projectId: p.id, userId: member.user.id, role: 'MEMBER' },
-        { projectId: p.id, userId: lead.user.id, role: 'LEAD' },
+        { projectId: p.id, userId: member.user.id, role: 'VIEWER' },
+        { projectId: p.id, userId: lead.user.id, role: 'EDITOR' },
       ],
     });
     await prisma.judgeAssignment.create({ data: { projectId: p.id, judgeId: judge.user.id, assignedById: admin.user.id } });
@@ -581,7 +583,8 @@ describe('collaborators', () => {
     expect((await post(judge, target.id)).status).toBe(403);
     expect((await post(investor, target.id)).status).toBe(403);
     expect(await prisma.projectCollaborator.count({ where: { projectId: p.id, userId: target.id } })).toBe(0);
-    expect((await post(lead, target.id)).status).toBe(201);
+    expect((await post(lead, target.id)).status).toBe(403); // an EDITOR cannot add people
+    expect((await post(owner, target.id)).status).toBe(201);
     expect((await post(admin, target2.id)).status).toBe(201);
 
     // GET list: judges and investors are outside the project team; strangers can't see it.
@@ -597,13 +600,14 @@ describe('collaborators', () => {
     expect((await del(stranger, target.id)).status).toBe(404);
     expect((await del(judge, target.id)).status).toBe(403);
     expect((await del(investor, target.id)).status).toBe(403);
-    expect((await del(lead, target.id)).status).toBe(204);
+    expect((await del(lead, target.id)).status).toBe(403);
+    expect((await del(owner, target.id)).status).toBe(204);
     expect((await del(admin, target2.id)).status).toBe(204);
   });
 
   it('removal works, revokes the collaborator\'s read access, and the owner cannot be removed', async () => {
-    const owner = await as('RESEARCHER');
-    const student = await as('STUDENT');
+    const owner = await as('USER');
+    const student = await as('USER');
     const p = await mkProject(owner.user.id);
     await api().post(`/projects/${p.id}/collaborators`).set(owner.h).send({ userId: student.user.id });
     expect((await api().get(`/projects/${p.id}`).set(student.h)).status).toBe(200);
@@ -616,15 +620,69 @@ describe('collaborators', () => {
   });
 
   it('a project is not touched via another project\'s collaborator route', async () => {
-    const owner = await as('RESEARCHER');
-    const other = await as('RESEARCHER');
-    const student = await makeUser('STUDENT');
+    const owner = await as('USER');
+    const other = await as('USER');
+    const student = await makeUser('USER');
     const mine = await mkProject(owner.user.id);
     const theirs = await mkProject(other.user.id);
-    await prisma.projectCollaborator.create({ data: { projectId: theirs.id, userId: student.id, role: 'MEMBER' } });
+    await prisma.projectCollaborator.create({ data: { projectId: theirs.id, userId: student.id, role: 'VIEWER' } });
     // owner tries to remove a collaborator of someone else's project
     expect((await api().delete(`/projects/${theirs.id}/collaborators/${student.id}`).set(owner.h)).status).toBe(404);
     expect((await api().delete(`/projects/${mine.id}/collaborators/${student.id}`).set(owner.h)).status).toBe(404);
     expect(await prisma.projectCollaborator.count({ where: { projectId: theirs.id } })).toBe(1);
+  });
+});
+
+describe('collaborator permissions (owner controls view / edit)', () => {
+  const putRole = (a: Actor, pid: string, uid: string, role: string) =>
+    api().put(`/projects/${pid}/collaborators/${uid}`).set(a.h).send({ role });
+
+  it('a VIEWER reads but cannot edit; promoting to EDITOR lets them edit; the owner can revoke it again', async () => {
+    const owner = await as('USER');
+    const collab = await as('USER');
+    const stranger = await as('USER');
+    const p = await mkProject(owner.user.id);
+    await api().post(`/projects/${p.id}/collaborators`).set(owner.h).send({ email: collab.user.email, role: 'VIEWER' });
+
+    expect((await api().get(`/projects/${p.id}`).set(collab.h)).status).toBe(200);
+    expect((await api().put(`/projects/${p.id}`).set(collab.h).send({ title: 'Cambiado' })).status).toBe(403);
+    expect((await prisma.project.findUniqueOrThrow({ where: { id: p.id } })).title).not.toBe('Cambiado');
+
+    expect((await putRole(collab, p.id, collab.user.id, 'EDITOR')).status).toBe(403); // cannot self-promote
+    expect((await putRole(stranger, p.id, collab.user.id, 'EDITOR')).status).toBe(404);
+    const promoted = await putRole(owner, p.id, collab.user.id, 'EDITOR');
+    expect(promoted.status).toBe(200);
+    expect(promoted.body.data.find((c: { userId: string }) => c.userId === collab.user.id).role).toBe('EDITOR');
+    expect((await api().put(`/projects/${p.id}`).set(collab.h).send({ title: 'Cambiado' })).status).toBe(200);
+    expect(await prisma.notification.count({ where: { userId: collab.user.id } })).toBeGreaterThanOrEqual(2);
+
+    expect((await putRole(owner, p.id, collab.user.id, 'VIEWER')).status).toBe(200);
+    expect((await api().put(`/projects/${p.id}`).set(collab.h).send({ title: 'Otra vez' })).status).toBe(403);
+  });
+
+  it('validates the role, protects the owner row and unknown collaborators', async () => {
+    const owner = await as('USER');
+    const other = await as('USER');
+    const p = await mkProject(owner.user.id);
+    expect((await putRole(owner, p.id, owner.user.id, 'VIEWER')).status).toBe(409);
+    expect((await putRole(owner, p.id, other.user.id, 'EDITOR')).status).toBe(404); // not a collaborator
+    expect((await putRole(owner, p.id, other.user.id, 'LEAD')).status).toBe(400);
+  });
+
+  it('milestones follow the same rule: VIEWER 403, EDITOR ok', async () => {
+    const owner = await as('USER');
+    const viewer = await as('USER');
+    const editor = await as('USER');
+    const p = await mkProject(owner.user.id);
+    await prisma.projectCollaborator.createMany({
+      data: [
+        { projectId: p.id, userId: viewer.user.id, role: 'VIEWER' },
+        { projectId: p.id, userId: editor.user.id, role: 'EDITOR' },
+      ],
+    });
+    const add = (a: Actor) => api().post(`/projects/${p.id}/milestones`).set(a.h).send({ title: 'Hito' });
+    expect((await add(viewer)).status).toBe(403);
+    expect((await add(editor)).status).toBe(201);
+    expect((await api().get(`/projects/${p.id}/milestones`).set(viewer.h)).status).toBe(200);
   });
 });

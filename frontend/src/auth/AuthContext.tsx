@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { getMe, login } from '../api/auth';
+import { getMe, login, register, type RegisterInput } from '../api/auth';
 import { setUnauthorizedHandler } from '../api/client';
 import type { User } from '../api/types';
 import { tokenStore } from './tokenStore';
@@ -20,6 +20,8 @@ interface AuthContextValue {
   /** True after the server rejected the stored token (e.g. 30 minutes of inactivity). */
   sessionExpired: boolean;
   signIn: (email: string, password: string) => Promise<void>;
+  /** Public signup (USER role); signs the new account in. */
+  signUp: (input: RegisterInput) => Promise<void>;
   signOut: () => void;
 }
 
@@ -70,6 +72,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus('authenticated');
   }, []);
 
+  const signUp = useCallback(async (input: RegisterInput) => {
+    const result = await register(input);
+    tokenStore.set(result.token);
+    setUser(result.user);
+    setSessionExpired(false);
+    setStatus('authenticated');
+  }, []);
+
   const signOut = useCallback(() => {
     tokenStore.clear();
     setUser(null);
@@ -78,8 +88,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ status, user, sessionExpired, signIn, signOut }),
-    [status, user, sessionExpired, signIn, signOut],
+    () => ({ status, user, sessionExpired, signIn, signUp, signOut }),
+    [status, user, sessionExpired, signIn, signUp, signOut],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

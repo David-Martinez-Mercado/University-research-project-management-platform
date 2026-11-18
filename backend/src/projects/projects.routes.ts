@@ -8,6 +8,7 @@ import {
   createProjectSchema,
   listProjectsQuerySchema,
   projectIdParamSchema,
+  updateCollaboratorSchema,
   updateProjectSchema,
 } from './projects.schemas';
 import {
@@ -18,6 +19,7 @@ import {
   listCollaborators,
   listProjects,
   removeCollaborator,
+  updateCollaboratorRole,
   updateProject,
 } from './projects.service';
 
@@ -26,12 +28,12 @@ export const projectsRouter = Router();
 // Role gate only decides "may this ROLE ever use the endpoint". Which concrete project a caller
 // may see / manage is decided in the service, inside the database query (see projects.scope.ts).
 // `req.user` is always set here: authorize() runs authenticate first and denies by default.
-const ALL_ROLES = ['ADMINISTRATOR', 'RESEARCHER', 'STUDENT', 'JUDGE', 'INVESTOR'] as const;
-const PROJECT_TEAM_ROLES = ['ADMINISTRATOR', 'RESEARCHER', 'STUDENT'] as const;
+const ALL_ROLES = ['ADMINISTRATOR', 'USER', 'JUDGE', 'INVESTOR'] as const;
+const PROJECT_TEAM_ROLES = ['ADMINISTRATOR', 'USER'] as const;
 
 projectsRouter.post(
   '/',
-  ...authorize({ roles: ['RESEARCHER', 'ADMINISTRATOR'] }),
+  ...authorize({ roles: ['USER', 'ADMINISTRATOR'] }),
   asyncHandler(async (req, res) => {
     const input = createProjectSchema.parse(req.body);
     res.status(201).json(await createProject(input, req.user!));
@@ -92,6 +94,16 @@ projectsRouter.post(
     const { id } = projectIdParamSchema.parse(req.params);
     const input = addCollaboratorSchema.parse(req.body);
     res.status(201).json({ data: await addCollaborator(id, input, req.user!) });
+  }),
+);
+
+projectsRouter.put(
+  '/:id/collaborators/:userId',
+  ...authorize({ roles: [...PROJECT_TEAM_ROLES] }),
+  asyncHandler(async (req, res) => {
+    const { id, userId } = collaboratorParamsSchema.parse(req.params);
+    const { role } = updateCollaboratorSchema.parse(req.body);
+    res.json({ data: await updateCollaboratorRole(id, userId, role, req.user!) });
   }),
 );
 

@@ -5,7 +5,7 @@ import { callsTo, jsonResponse, makeCollaborator, makeProject, makeUser, renderA
 
 describe('create project', () => {
   it('validates the title client-side and sends nothing', async () => {
-    const fetchMock = signedInAs(makeUser('RESEARCHER'));
+    const fetchMock = signedInAs(makeUser('USER'));
     renderApp('/projects/new');
 
     await userEvent.setup().click(await screen.findByRole('button', { name: 'Crear proyecto' }));
@@ -16,7 +16,7 @@ describe('create project', () => {
   });
 
   it('maps the 400 details of the server onto the fields', async () => {
-    signedInAs(makeUser('RESEARCHER'), {
+    signedInAs(makeUser('USER'), {
       'POST /projects': () =>
         jsonResponse(400, {
           error: 'Validation failed',
@@ -41,7 +41,7 @@ describe('create project', () => {
   });
 
   it('creates the project (omitting empty optional fields) and opens its workspace', async () => {
-    const researcher = makeUser('RESEARCHER');
+    const researcher = makeUser('USER');
     const created = makeProject({ title: 'Mi proyecto', ownerId: researcher.id });
     const fetchMock = signedInAs(researcher, {
       'POST /projects': () => jsonResponse(201, created),
@@ -72,10 +72,10 @@ describe('create project', () => {
   });
 
   it('sends roles that cannot create projects back to the dashboard', async () => {
-    signedInAs(makeUser('STUDENT'), { 'GET /projects': () => jsonResponse(200, { data: [], total: 0, limit: 10, offset: 0 }) });
+    signedInAs(makeUser('JUDGE'), { 'GET /projects': () => jsonResponse(200, { data: [], total: 0, limit: 10, offset: 0 }) });
     renderApp('/projects/new');
 
-    expect(await screen.findByRole('heading', { name: 'Mis proyectos' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Proyectos asignados' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Crear proyecto' })).not.toBeInTheDocument();
   });
 });

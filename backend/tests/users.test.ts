@@ -43,7 +43,7 @@ describe('POST /users', () => {
   });
 
   it('is forbidden for non-administrators', async () => {
-    const r = await makeUser('RESEARCHER');
+    const r = await makeUser('USER');
     const { token } = await loginAs(r.email);
     expect((await api().post('/users').set(bearer(token)).send(newUser)).status).toBe(403);
   });
@@ -52,18 +52,18 @@ describe('POST /users', () => {
 describe('PUT /users/:id', () => {
   it('updates profile fields, role and active flag', async () => {
     const { token } = await adminToken();
-    const target = await makeUser('STUDENT');
+    const target = await makeUser('USER');
     const res = await api()
       .put(`/users/${target.id}`)
       .set(bearer(token))
-      .send({ fullName: 'Renamed', role: 'RESEARCHER', affiliation: 'Unipoli', isActive: false });
+      .send({ fullName: 'Renamed', role: 'USER', affiliation: 'Unipoli', isActive: false });
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ fullName: 'Renamed', role: 'RESEARCHER', affiliation: 'Unipoli', isActive: false });
+    expect(res.body).toMatchObject({ fullName: 'Renamed', role: 'USER', affiliation: 'Unipoli', isActive: false });
   });
 
   it('resets the password and clears a lockout', async () => {
     const { token } = await adminToken();
-    const target = await makeUser('STUDENT');
+    const target = await makeUser('USER');
     for (let i = 0; i < 5; i++) await api().post('/auth/login').send({ email: target.email, password: 'wrong-wrong-wrong' });
     expect((await loginAs(target.email)).res.status).toBe(423);
 
@@ -75,7 +75,7 @@ describe('PUT /users/:id', () => {
 
   it('unlocks an account without changing the password', async () => {
     const { token } = await adminToken();
-    const target = await makeUser('STUDENT');
+    const target = await makeUser('USER');
     for (let i = 0; i < 5; i++) await api().post('/auth/login').send({ email: target.email, password: 'wrong-wrong-wrong' });
     expect((await api().put(`/users/${target.id}`).set(bearer(token)).send({ unlockAccount: true })).status).toBe(200);
     expect((await loginAs(target.email)).res.status).toBe(200);
@@ -84,7 +84,7 @@ describe('PUT /users/:id', () => {
   it('protects the owner from demotion and deactivation', async () => {
     const { token } = await adminToken();
     const owner = await makeUser('ADMINISTRATOR', { isOwner: true });
-    expect((await api().put(`/users/${owner.id}`).set(bearer(token)).send({ role: 'STUDENT' })).status).toBe(409);
+    expect((await api().put(`/users/${owner.id}`).set(bearer(token)).send({ role: 'USER' })).status).toBe(409);
     expect((await api().put(`/users/${owner.id}`).set(bearer(token)).send({ isActive: false })).status).toBe(409);
     expect((await api().put(`/users/${owner.id}`).set(bearer(token)).send({ fullName: 'Still Fine' })).status).toBe(200);
   });
@@ -93,21 +93,21 @@ describe('PUT /users/:id', () => {
     const { token } = await adminToken();
     expect((await api().put('/users/00000000-0000-4000-8000-000000000000').set(bearer(token)).send({ fullName: 'x' })).status).toBe(404);
     expect((await api().put('/users/not-a-uuid').set(bearer(token)).send({ fullName: 'x' })).status).toBe(400);
-    const target = await makeUser('STUDENT');
+    const target = await makeUser('USER');
     expect((await api().put(`/users/${target.id}`).set(bearer(token)).send({})).status).toBe(400);
   });
 
   it('is forbidden for non-administrators, even on their own record', async () => {
-    const s = await makeUser('STUDENT');
+    const s = await makeUser('USER');
     const { token } = await loginAs(s.email);
     // privilege-escalation attempt
     const res = await api().put(`/users/${s.id}`).set(bearer(token)).send({ role: 'ADMINISTRATOR' });
     expect(res.status).toBe(403);
-    expect((await prisma.user.findUniqueOrThrow({ where: { id: s.id } })).role).toBe('STUDENT');
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: s.id } })).role).toBe('USER');
   });
 
   it('requires authentication', async () => {
-    const s = await makeUser('STUDENT');
+    const s = await makeUser('USER');
     expect((await api().put(`/users/${s.id}`).send({ fullName: 'x' })).status).toBe(401);
   });
 });
@@ -117,7 +117,7 @@ describe('GET /users', () => {
     const { admin, token } = await adminToken();
     const alice = await makeUser('JUDGE', { email: 'alice.judge@test.local' });
     const bob = await makeUser('JUDGE', { email: 'bob@example.org' });
-    const carol = await makeUser('RESEARCHER', { email: 'carol@test.local' });
+    const carol = await makeUser('USER', { email: 'carol@test.local' });
     await prisma.user.update({ where: { id: alice.id }, data: { fullName: 'Alice Johnson' } });
     await prisma.user.update({ where: { id: bob.id }, data: { fullName: 'Bob Stone' } });
     await prisma.user.update({ where: { id: carol.id }, data: { fullName: 'Carol 100%_Done' } });
@@ -126,7 +126,7 @@ describe('GET /users', () => {
 
   it('requires authentication (401) and administrator role (403)', async () => {
     expect((await api().get('/users')).status).toBe(401);
-    for (const role of ['RESEARCHER', 'STUDENT', 'JUDGE', 'INVESTOR'] as const) {
+    for (const role of ['USER', 'USER', 'JUDGE', 'INVESTOR'] as const) {
       const u = await makeUser(role);
       const { token } = await loginAs(u.email);
       expect((await api().get('/users').set(bearer(token))).status).toBe(403);

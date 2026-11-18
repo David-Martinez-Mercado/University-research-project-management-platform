@@ -51,3 +51,15 @@ Las pruebas **se niegan a correr contra un host que no sea local**, así que nun
 ## Migraciones y Prisma
 
 `20261015150000_users_single_owner` agrega el índice parcial a mano. Prisma no puede representar ni este índice ni el HNSW de `document_chunks`, así que `prisma migrate diff` / `migrate dev` propondrán `DROP INDEX "document_chunks_embedding_vector_hnsw_idx"`. **Nunca aceptes ese DROP**; borra esa línea de cualquier migración autogenerada.
+
+
+## Roles y registro (17 nov)
+
+| Rol | Etiqueta en la UI | Cómo se crea |
+|---|---|---|
+| `USER` | Usuario (investigador / estudiante) | **Se registra solo**: `POST /auth/register` (público, limitado por IP). Siempre crea `USER`; si el cuerpo trae `role` (o cualquier otra clave) responde 400. |
+| `JUDGE` | Revisor de proyecto (califica el proyecto completo) | Solo un administrador: `POST /users`. |
+| `INVESTOR` | Revisor de avances (solo lectura de proyectos vinculados) | Solo un administrador: `POST /users`. |
+| `ADMINISTRATOR` | Administrador | Bootstrap del propietario o un administrador. |
+
+`SIGNUP_EMAIL_DOMAIN` (opcional) limita el registro público a un dominio institucional (422 `EMAIL_DOMAIN_NOT_ALLOWED`). Migración `20261117120000`: `RESEARCHER` y `STUDENT` pasan a `USER`.

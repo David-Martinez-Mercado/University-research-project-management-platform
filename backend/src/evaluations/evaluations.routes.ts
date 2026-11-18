@@ -32,7 +32,7 @@ projectEvaluationRouter.get(
 
 projectEvaluationRouter.get(
   '/:id/results',
-  ...authorize({ roles: ['ADMINISTRATOR', 'RESEARCHER', 'STUDENT', 'JUDGE', 'INVESTOR'] }),
+  ...authorize({ roles: ['ADMINISTRATOR', 'USER', 'JUDGE', 'INVESTOR'] }),
   asyncHandler(async (req, res) => {
     const { id } = idParam.parse(req.params);
     res.json(await getResults(id, req.user!));

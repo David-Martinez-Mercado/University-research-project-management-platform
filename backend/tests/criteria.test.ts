@@ -31,7 +31,7 @@ describe('authentication and RBAC on /criteria', () => {
     for (const c of calls) expect((await c).status).toBe(401);
   });
 
-  it.each(['RESEARCHER', 'STUDENT', 'INVESTOR'] as const)('forbids %s everywhere on /criteria (403)', async (role) => {
+  it.each(['USER', 'USER', 'INVESTOR'] as const)('forbids %s everywhere on /criteria (403)', async (role) => {
     const a = await as(role);
     const c = await mkCriterion('Novelty', 1);
     expect((await api().get('/criteria').set(a.h)).status).toBe(403);
@@ -180,7 +180,7 @@ describe('GET /projects/:id/rubric', () => {
     await mkCriterion('First', 1);
     await mkCriterion('Retired', 0, { isActive: false });
     const admin = await as('ADMINISTRATOR');
-    const owner = await as('RESEARCHER');
+    const owner = await as('USER');
     const project = await prisma.project.create({ data: { ownerId: owner.user.id, title: 'P', status: 'SUBMITTED' } });
     return { admin, owner, project };
   }
@@ -188,7 +188,7 @@ describe('GET /projects/:id/rubric', () => {
 
   it('returns the ordered ACTIVE criteria to the team, an administrator and the assigned judge', async () => {
     const { admin, owner, project } = await seed();
-    const member = await as('STUDENT');
+    const member = await as('USER');
     const judge = await as('JUDGE');
     await prisma.projectCollaborator.create({ data: { projectId: project.id, userId: member.user.id } });
     await prisma.judgeAssignment.create({ data: { projectId: project.id, judgeId: judge.user.id, assignedById: admin.user.id } });
@@ -203,8 +203,8 @@ describe('GET /projects/:id/rubric', () => {
 
   it('is invisible (404) to non-members and unassigned judges, and 403 for investors even if linked', async () => {
     const { admin, project } = await seed();
-    const outsider = await as('RESEARCHER');
-    const student = await as('STUDENT');
+    const outsider = await as('USER');
+    const student = await as('USER');
     const judge = await as('JUDGE');
     const investor = await as('INVESTOR');
     await prisma.investorProjectLink.create({ data: { projectId: project.id, investorId: investor.user.id, linkedById: admin.user.id } });

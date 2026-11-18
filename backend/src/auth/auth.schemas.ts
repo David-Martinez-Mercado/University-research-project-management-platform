@@ -13,3 +13,14 @@ export const bootstrapOwnerSchema = z.object({
   fullName: z.string().trim().min(1).max(200),
   affiliation: z.string().trim().max(200).optional(),
 });
+
+// Public signup. `.strict()` rejects a `role` (or any other privileged key) instead of ignoring it: self-signup can only
+// ever create a USER. Reviewers (JUDGE / INVESTOR) and administrators are created by an administrator.
+export const registerSchema = z
+  .object({
+    email,
+    password,
+    fullName: z.string().trim().min(1).max(200),
+    affiliation: z.string().trim().max(200).optional(),
+  })
+  .strict();

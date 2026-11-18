@@ -64,7 +64,7 @@ async function expectNothingSaved(projectId?: string) {
 
 /** Researcher who owns a DRAFT project. */
 async function setup() {
-  const owner = await as('RESEARCHER');
+  const owner = await as('USER');
   const project = await mkProject(owner.user.id);
   return { owner, project };
 }
@@ -340,7 +340,7 @@ describe('POST /projects/:id/documents - validation rejects and saves nothing', 
   });
 
   it('returns 400 for a non-uuid project id', async () => {
-    const owner = await as('RESEARCHER');
+    const owner = await as('USER');
     const res = await upload(owner, 'not-a-uuid', TXT_BYTES, 'a.txt');
     expect(res.status).toBe(400);
   });
@@ -364,7 +364,7 @@ describe('POST /projects/:id/documents - permissions', () => {
 
   it('returns 404 (not 403) to a researcher/student who cannot see the project', async () => {
     const { project } = await setup();
-    for (const role of ['RESEARCHER', 'STUDENT'] as const) {
+    for (const role of ['USER', 'USER'] as const) {
       const outsider = await as(role);
       expect((await upload(outsider, project.id, TXT_BYTES, 'a.txt')).status).toBe(404);
     }
@@ -372,14 +372,20 @@ describe('POST /projects/:id/documents - permissions', () => {
     await expectNothingSaved();
   });
 
-  it('lets collaborators (MEMBER and LEAD, researcher and student) and administrators upload', async () => {
-    const { project } = await setup();
-    const member = await as('STUDENT');
-    const lead = await as('RESEARCHER');
-    await prisma.projectCollaborator.create({ data: { projectId: project.id, userId: member.user.id, role: 'MEMBER' } });
-    await prisma.projectCollaborator.create({ data: { projectId: project.id, userId: lead.user.id, role: 'LEAD' } });
+  it('lets the owner, EDITOR collaborators and administrators upload; VIEWER collaborators get 403', async () => {
+    const { project, owner } = await setup();
+    const viewer = await as('USER');
+    const editor = await as('USER');
+    await prisma.projectCollaborator.create({ data: { projectId: project.id, userId: viewer.user.id, role: 'VIEWER' } });
+    await prisma.projectCollaborator.create({ data: { projectId: project.id, userId: editor.user.id, role: 'EDITOR' } });
     const admin = await as('ADMINISTRATOR');
-    for (const a of [member, lead, admin]) {
+
+    expect((await upload(viewer, project.id, TXT_BYTES, 'a.txt')).status).toBe(403);
+    await expectNothingSaved();
+    // A view-only collaborator can still read the documents.
+    expect((await api().get(`/projects/${project.id}/documents`).set(viewer.h)).status).toBe(200);
+
+    for (const a of [owner, editor, admin]) {
       const res = await upload(a, project.id, TXT_BYTES, 'a.txt');
       expect(res.status).toBe(201);
       expect(res.body.uploadedBy.id).toBe(a.user.id);
@@ -394,7 +400,7 @@ describe('POST /projects/:id/documents - permissions', () => {
     ['EVALUATED', 409],
     ['ARCHIVED', 409],
   ] as const)('project in %s -> %i (also for administrators)', async (status, expected) => {
-    const owner = await as('RESEARCHER');
+    const owner = await as('USER');
     const admin = await as('ADMINISTRATOR');
     const project = await mkProject(owner.user.id, status);
     expect((await upload(owner, project.id, TXT_BYTES, 'a.txt')).status).toBe(expected);
@@ -461,9 +467,9 @@ describe('GET /projects/:id/documents', () => {
   it('scopes by role with real rows', async () => {
     const { project, other } = await seed();
     const admin = await as('ADMINISTRATOR');
-    const member = await as('STUDENT');
+    const member = await as('USER');
     await prisma.projectCollaborator.create({ data: { projectId: project.id, userId: member.user.id } });
-    const outsider = await as('RESEARCHER');
+    const outsider = await as('USER');
     const assignedJudge = await as('JUDGE');
     const otherJudge = await as('JUDGE');
     await prisma.judgeAssignment.create({ data: { projectId: project.id, judgeId: assignedJudge.user.id, assignedById: admin.user.id } });
@@ -488,7 +494,7 @@ describe('GET /projects/:id/documents', () => {
   it('revokes access when the collaborator is removed or the judge assignment is deleted', async () => {
     const { project } = await seed();
     const admin = await as('ADMINISTRATOR');
-    const member = await as('RESEARCHER');
+    const member = await as('USER');
     const judge = await as('JUDGE');
     await prisma.projectCollaborator.create({ data: { projectId: project.id, userId: member.user.id } });
     const assignment = await prisma.judgeAssignment.create({
@@ -503,7 +509,7 @@ describe('GET /projects/:id/documents', () => {
   });
 
   it('judges can read documents of any project status', async () => {
-    const owner = await as('RESEARCHER');
+    const owner = await as('USER');
     const admin = await as('ADMINISTRATOR');
     const judge = await as('JUDGE');
     const project = await mkProject(owner.user.id, 'SUBMITTED');
@@ -559,7 +565,7 @@ describe('GET /projects/:id/documents/:docId/download', () => {
     const judge = await as('JUDGE');
     const stranger = await as('JUDGE');
     const investor = await as('INVESTOR');
-    const outsider = await as('STUDENT');
+    const outsider = await as('USER');
     await prisma.judgeAssignment.create({ data: { projectId: project.id, judgeId: judge.user.id, assignedById: admin.user.id } });
     await prisma.investorProjectLink.create({ data: { projectId: project.id, investorId: investor.user.id, linkedById: admin.user.id } });
 

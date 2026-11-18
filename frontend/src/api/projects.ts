@@ -48,3 +48,10 @@ export const addCollaborator = (projectId: string, email: string, role: Collabor
 
 export const removeCollaborator = (projectId: string, userId: string) =>
   apiRequest<void>(`/projects/${projectId}/collaborators/${userId}`, { method: 'DELETE' });
+
+/** Owner only: change what a collaborator may do. Returns the full, updated collaborator list. */
+export const updateCollaboratorRole = (projectId: string, userId: string, role: CollaboratorRole) =>
+  apiRequest<{ data: Collaborator[] }>(`/projects/${projectId}/collaborators/${userId}`, {
+    method: 'PUT',
+    body: { role },
+  }).then((r) => r.data);

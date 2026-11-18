@@ -7,7 +7,7 @@ import { askProject, askSchema, flagInteraction, interactionsQuerySchema, listIn
 
 const idParam = z.object({ id: z.string().uuid() });
 // Investors never reach project documents (BR-007), so they cannot use the assistant either.
-const ASK_ROLES = ['ADMINISTRATOR', 'RESEARCHER', 'STUDENT', 'JUDGE'] as const;
+const ASK_ROLES = ['ADMINISTRATOR', 'USER', 'JUDGE'] as const;
 
 /** Mounted at /projects. */
 export const projectAiRouter = Router();

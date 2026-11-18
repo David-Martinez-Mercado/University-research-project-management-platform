@@ -14,6 +14,7 @@ import { CreateProjectPage } from './pages/CreateProjectPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { ProjectWorkspacePage } from './pages/ProjectWorkspacePage';
+import { SignupPage } from './pages/SignupPage';
 
 // Literal env check so the mocks folder is excluded from production bundles unless enabled.
 const MockBanner =
@@ -37,6 +38,7 @@ export function App() {
       )}
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<SignupPage />} />
         <Route element={<ProtectedRoute />}>
           <Route path="/" element={<HomePage />} />
           <Route path="/notifications" element={<NotificationsPage />} />

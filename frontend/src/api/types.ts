@@ -1,4 +1,5 @@
-export const ROLES = ['INVESTOR', 'RESEARCHER', 'JUDGE', 'STUDENT', 'ADMINISTRATOR'] as const;
+/** USER = investigador/estudiante (self-signup). JUDGE and INVESTOR are reviewers, created only by an administrator. */
+export const ROLES = ['INVESTOR', 'USER', 'JUDGE', 'ADMINISTRATOR'] as const;
 export type Role = (typeof ROLES)[number];
 
 /** Public user shape returned by the backend (never includes password data). */
@@ -83,7 +84,8 @@ export interface ProjectPatch {
   affiliation?: string | null;
 }
 
-export type CollaboratorRole = 'LEAD' | 'MEMBER';
+/** What the project owner lets a collaborator do: EDITOR = view and edit, VIEWER = read-only. */
+export type CollaboratorRole = 'EDITOR' | 'VIEWER';
 
 export interface Collaborator {
   userId: string;
@@ -91,7 +93,7 @@ export interface Collaborator {
   email: string;
   userRole: Role;
   role: CollaboratorRole;
-  /** The owner is an implicit LEAD and cannot be removed. */
+  /** The owner always has full access and cannot be removed or demoted. */
   isOwner: boolean;
   addedAt: string;
 }

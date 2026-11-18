@@ -63,7 +63,7 @@ describe('JWT middleware', () => {
   });
 
   it('stops accepting a still-valid token once the user is deactivated', async () => {
-    const u = await makeUser('RESEARCHER');
+    const u = await makeUser('USER');
     const { token } = await loginAs(u.email);
     expect((await api().get('/auth/me').set(bearer(token))).status).toBe(200);
     await prisma.user.update({ where: { id: u.id }, data: { isActive: false } });
@@ -72,7 +72,7 @@ describe('JWT middleware', () => {
 });
 
 describe('RBAC middleware (FR-030)', () => {
-  it.each(['RESEARCHER', 'JUDGE', 'STUDENT', 'INVESTOR'] as const)('forbids %s on an admin-only route', async (role) => {
+  it.each(['USER', 'JUDGE', 'USER', 'INVESTOR'] as const)('forbids %s on an admin-only route', async (role) => {
     const u = await makeUser(role);
     const { token } = await loginAs(u.email);
     const res = await probe(token);
@@ -89,13 +89,13 @@ describe('RBAC middleware (FR-030)', () => {
     const admin = await makeUser('ADMINISTRATOR');
     const { token } = await loginAs(admin.email);
     expect((await probe(token)).status).toBe(400);
-    await prisma.user.update({ where: { id: admin.id }, data: { role: 'STUDENT' } });
+    await prisma.user.update({ where: { id: admin.id }, data: { role: 'USER' } });
     expect((await probe(token)).status).toBe(403);
   });
 
   it('revalidates ownership per request: users can read themselves but not others', async () => {
-    const a = await makeUser('STUDENT');
-    const b = await makeUser('STUDENT');
+    const a = await makeUser('USER');
+    const b = await makeUser('USER');
     const { token } = await loginAs(a.email);
     expect((await api().get(`/users/${a.id}`).set(bearer(token))).status).toBe(200);
     expect((await api().get(`/users/${b.id}`).set(bearer(token))).status).toBe(403);
@@ -118,7 +118,7 @@ describe('RBAC middleware (FR-030)', () => {
     });
 
     it('denies when the ownership predicate throws', async () => {
-      const u = await makeUser('STUDENT');
+      const u = await makeUser('USER');
       const { token } = await loginAs(u.email);
       const app = build({
         ownership: () => {
@@ -129,7 +129,7 @@ describe('RBAC middleware (FR-030)', () => {
     });
 
     it('denies when the ownership predicate rejects, or returns a non-true value', async () => {
-      const u = await makeUser('STUDENT');
+      const u = await makeUser('USER');
       const { token } = await loginAs(u.email);
       const rejects = build({ ownership: () => Promise.reject(new Error('boom')) });
       expect((await request(rejects).get('/x').set(bearer(token))).status).toBe(403);

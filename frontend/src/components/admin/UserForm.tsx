@@ -3,7 +3,7 @@ import { createUser, updateUser } from '../../api/users';
 import { ROLES, type Role, type User } from '../../api/types';
 import { Alert, Button, Input, Select } from '../ui';
 import { describeError, fieldErrorsFrom } from '../../lib/errors';
-import { ROLE_LABELS } from '../../lib/roles';
+import { ROLE_DESCRIPTIONS, ROLE_LABELS } from '../../lib/roles';
 
 interface Props {
   /** Present = edit this user; absent = create a new one. */
@@ -18,7 +18,7 @@ export function UserForm({ user, onSaved, onCancel }: Props) {
   const editing = !!user;
   const [fullName, setFullName] = useState(user?.fullName ?? '');
   const [email, setEmail] = useState(user?.email ?? '');
-  const [role, setRole] = useState<Role>(user?.role ?? 'RESEARCHER');
+  const [role, setRole] = useState<Role>(user?.role ?? 'JUDGE');
   const [affiliation, setAffiliation] = useState(user?.affiliation ?? '');
   const [password, setPassword] = useState('');
   const [isActive, setIsActive] = useState(user?.isActive ?? true);
@@ -84,7 +84,13 @@ export function UserForm({ user, onSaved, onCancel }: Props) {
           disabled={saving || editing}
           hint={editing ? 'El correo no se puede cambiar.' : undefined}
         />
-        <Select label="Rol" value={role} onChange={(e) => setRole(e.target.value as Role)} disabled={saving}>
+        <Select
+          label="Rol"
+          value={role}
+          onChange={(e) => setRole(e.target.value as Role)}
+          disabled={saving}
+          hint={ROLE_DESCRIPTIONS[role]}
+        >
           {ROLES.map((r) => (
             <option key={r} value={r}>
               {ROLE_LABELS[r]}

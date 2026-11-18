@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { addCollaborator, removeCollaborator } from '../../api/projects';
+import { addCollaborator, removeCollaborator, updateCollaboratorRole } from '../../api/projects';
 import type { Collaborator, CollaboratorRole } from '../../api/types';
 import { describeError, fieldErrorsFrom } from '../../lib/errors';
 import { COLLABORATOR_ROLE_LABELS, formatDate } from '../../lib/labels';
@@ -10,16 +10,23 @@ import type { WorkspaceContext } from './types';
 // Light client-side check; the server is the authority.
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function CollaboratorsTab({ project, canManage, userId, collaborators }: WorkspaceContext) {
+const PERMISSIONS: CollaboratorRole[] = ['EDITOR', 'VIEWER'];
+
+/**
+ * Collaborators and what each may do. Only the owner (and an administrator) adds, removes and changes permissions:
+ * EDITOR = view and edit, VIEWER = read-only. The backend enforces it; this screen only shows the controls to those who may use them.
+ */
+export function CollaboratorsTab({ project, canManage, canEdit, userId, collaborators }: WorkspaceContext) {
   const [newEmail, setNewEmail] = useState('');
-  const [newRole, setNewRole] = useState<CollaboratorRole>('MEMBER');
+  const [newRole, setNewRole] = useState<CollaboratorRole>('EDITOR');
   const [emailError, setEmailError] = useState<string | undefined>();
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
-  const [removeError, setRemoveError] = useState<string | null>(null);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
 
   if (!collaborators) return null;
   const { data, error, reload, setData } = collaborators;
@@ -40,7 +47,7 @@ export function CollaboratorsTab({ project, canManage, userId, collaborators }: 
       const updated = await addCollaborator(project.id, value, newRole);
       setData(updated);
       setNewEmail('');
-      setNotice('Colaborador agregado.');
+      setNotice('Colaborador agregado. Ya puede entrar al proyecto.');
     } catch (err) {
       const fields = fieldErrorsFrom(err);
       if (fields.email) setEmailError(fields.email);
@@ -51,7 +58,7 @@ export function CollaboratorsTab({ project, canManage, userId, collaborators }: 
   }
 
   async function handleRemove(member: Collaborator) {
-    setRemoveError(null);
+    setListError(null);
     setNotice(null);
     setRemovingId(member.userId);
     try {
@@ -60,42 +67,67 @@ export function CollaboratorsTab({ project, canManage, userId, collaborators }: 
       setConfirmingId(null);
       setNotice(`${member.fullName} ya no es colaborador.`);
     } catch (err) {
-      setRemoveError(describeError(err, 'collaborator-remove'));
+      setListError(describeError(err, 'collaborator-remove'));
     } finally {
       setRemovingId(null);
     }
   }
 
+  async function handlePermission(member: Collaborator, role: CollaboratorRole) {
+    if (role === member.role) return;
+    setListError(null);
+    setNotice(null);
+    setUpdatingId(member.userId);
+    try {
+      setData(await updateCollaboratorRole(project.id, member.userId, role));
+      setNotice(`${member.fullName}: ${COLLABORATOR_ROLE_LABELS[role].toLowerCase()}.`);
+    } catch (err) {
+      setListError(describeError(err, 'collaborator-update'));
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
+      {!canManage && (
+        <Alert tone="info">
+          {canEdit
+            ? 'Tienes permiso para editar este proyecto. Solo el dueño puede agregar personas o cambiar permisos.'
+            : 'Tienes permiso de solo lectura en este proyecto. Solo el dueño puede cambiar los permisos.'}
+        </Alert>
+      )}
+
       {canManage && (
         <Card
           title="Agregar colaborador"
-          description="Solo usuarios con rol Investigador o Estudiante pueden ser colaboradores."
+          description="La persona debe tener una cuenta de Usuario en la plataforma (puede crearla ella misma en «Crear cuenta»). Tú decides si puede editar o solo ver."
         >
           <form onSubmit={handleAdd} noValidate className="space-y-4">
             {addError && <Alert tone="error">{addError}</Alert>}
-            {notice && <Alert tone="success">{notice}</Alert>}
-            <div className="grid gap-4 sm:grid-cols-[1fr_12rem]">
+            <div className="grid gap-4 sm:grid-cols-[1fr_14rem]">
               <Input
                 label="Correo del colaborador"
                 type="email"
                 value={newEmail}
                 onChange={(e) => setNewEmail(e.target.value)}
                 error={emailError}
-                hint="El correo con el que la persona inició sesión en la plataforma."
+                hint="El correo con el que la persona se registró en la plataforma."
                 autoComplete="off"
                 spellCheck={false}
                 disabled={adding}
               />
               <Select
-                label="Rol en el proyecto"
+                label="Permiso"
                 value={newRole}
                 onChange={(e) => setNewRole(e.target.value as CollaboratorRole)}
                 disabled={adding}
               >
-                <option value="MEMBER">{COLLABORATOR_ROLE_LABELS.MEMBER}</option>
-                <option value="LEAD">{COLLABORATOR_ROLE_LABELS.LEAD}</option>
+                {PERMISSIONS.map((p) => (
+                  <option key={p} value={p}>
+                    {COLLABORATOR_ROLE_LABELS[p]}
+                  </option>
+                ))}
               </Select>
             </div>
             <Button type="submit" loading={adding}>
@@ -107,8 +139,8 @@ export function CollaboratorsTab({ project, canManage, userId, collaborators }: 
 
       <section aria-label="Colaboradores del proyecto" aria-busy={collaborators.loading} className="space-y-3">
         <h2 className="text-lg font-semibold">Colaboradores</h2>
-        {!canManage && notice && <Alert tone="success">{notice}</Alert>}
-        {removeError && <Alert tone="error">{removeError}</Alert>}
+        {notice && <Alert tone="success">{notice}</Alert>}
+        {listError && <Alert tone="error">{listError}</Alert>}
         {error && !data ? (
           <div className="space-y-3">
             <Alert tone="error">{describeError(error)}</Alert>
@@ -136,12 +168,38 @@ export function CollaboratorsTab({ project, canManage, userId, collaborators }: 
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      {member.isOwner && <Badge tone="info">Dueño</Badge>}
-                      <Badge tone={member.role === 'LEAD' ? 'success' : 'neutral'}>
-                        {COLLABORATOR_ROLE_LABELS[member.role]}
-                      </Badge>
-                      {canManage && !member.isOwner && (
-                        confirmingId === member.userId ? (
+                      {member.isOwner ? (
+                        <>
+                          <Badge tone="info">Dueño</Badge>
+                          <Badge tone="success">Acceso completo</Badge>
+                        </>
+                      ) : canManage ? (
+                        <div className="w-44">
+                          <label htmlFor={`perm-${member.userId}`} className="sr-only">
+                            Permiso de {member.fullName}
+                          </label>
+                          <select
+                            id={`perm-${member.userId}`}
+                            value={member.role}
+                            disabled={updatingId === member.userId}
+                            onChange={(e) => void handlePermission(member, e.target.value as CollaboratorRole)}
+                            className="block w-full rounded-lg bg-white px-3 py-1.5 text-sm shadow-sm ring-1 ring-inset ring-slate-300 focus-visible:outline-2 focus-visible:outline-brand-600 disabled:bg-slate-100"
+                          >
+                            {PERMISSIONS.map((p) => (
+                              <option key={p} value={p}>
+                                {COLLABORATOR_ROLE_LABELS[p]}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : (
+                        <Badge tone={member.role === 'EDITOR' ? 'success' : 'neutral'}>
+                          {COLLABORATOR_ROLE_LABELS[member.role]}
+                        </Badge>
+                      )}
+                      {canManage &&
+                        !member.isOwner &&
+                        (confirmingId === member.userId ? (
                           <>
                             <Button
                               variant="danger"
@@ -167,14 +225,13 @@ export function CollaboratorsTab({ project, canManage, userId, collaborators }: 
                             size="sm"
                             aria-label={`Quitar a ${member.fullName}`}
                             onClick={() => {
-                              setRemoveError(null);
+                              setListError(null);
                               setConfirmingId(member.userId);
                             }}
                           >
                             Quitar
                           </Button>
-                        )
-                      )}
+                        ))}
                     </div>
                   </div>
                 </Card>

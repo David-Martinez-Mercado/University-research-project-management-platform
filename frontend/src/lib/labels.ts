@@ -29,8 +29,8 @@ export const INGESTION_LABELS: Record<IngestionStatus, string> = {
 };
 
 export const COLLABORATOR_ROLE_LABELS: Record<CollaboratorRole, string> = {
-  LEAD: 'Líder',
-  MEMBER: 'Miembro',
+  EDITOR: 'Puede editar',
+  VIEWER: 'Solo lectura',
 };
 
 export const FIELD_LABELS: Record<string, string> = {

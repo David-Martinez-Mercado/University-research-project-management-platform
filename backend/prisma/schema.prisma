@@ -19,11 +19,12 @@ datasource db {
 
 // ───────────────────────── Enums ─────────────────────────
 
+// USER = investigador/estudiante (self-signup). JUDGE (reviews the whole project) and INVESTOR (reviews progress)
+// are "reviewers": they can only be created by an administrator.
 enum Role {
   INVESTOR
-  RESEARCHER
+  USER
   JUDGE
-  STUDENT
   ADMINISTRATOR
 }
 
@@ -37,9 +38,10 @@ enum ProjectStatus {
   ARCHIVED
 }
 
+// Permission the project owner grants a collaborator: EDITOR can edit the project, VIEWER is read-only.
 enum CollaboratorRole {
-  LEAD
-  MEMBER
+  EDITOR
+  VIEWER
 }
 
 enum DocumentType {
@@ -144,7 +146,7 @@ model ProjectCollaborator {
   id        String           @id @default(uuid()) @db.Uuid
   projectId String           @map("project_id") @db.Uuid
   userId    String           @map("user_id") @db.Uuid
-  role      CollaboratorRole @default(MEMBER)
+  role      CollaboratorRole @default(EDITOR)
   addedAt   DateTime         @default(now()) @map("added_at") @db.Timestamptz(6)
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
