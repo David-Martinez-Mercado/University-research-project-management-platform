@@ -1,8 +1,14 @@
-import { useState, type FormEvent } from 'react';
+import { lazy, Suspense, useState, type FormEvent } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { describeLoginError, type LoginFailure } from '../auth/loginErrors';
 import { Alert, BrandMark, Button, Icon, Input, type IconName } from '../components/ui';
+
+// Literal build-time check: in a production build the flag is false and Vite drops the demo module (and its passwords).
+const DemoAccess =
+  import.meta.env.DEV || import.meta.env.VITE_DEMO_LOGIN === 'true'
+    ? lazy(() => import('../components/DemoAccess').then((m) => ({ default: m.DemoAccess })))
+    : null;
 
 const EMAIL_PATTERN = /^\S+@\S+\.\S+$/;
 
@@ -44,6 +50,20 @@ export function LoginPage() {
     setSubmitting(true);
     try {
       await signIn(trimmedEmail, password);
+      navigate(redirectTo, { replace: true });
+    } catch (err) {
+      setFailure(describeLoginError(err));
+      setSubmitting(false);
+    }
+  }
+
+  async function quickSignIn(account: { email: string; password: string }) {
+    setEmail(account.email);
+    setPassword(account.password);
+    setFailure({});
+    setSubmitting(true);
+    try {
+      await signIn(account.email, account.password);
       navigate(redirectTo, { replace: true });
     } catch (err) {
       setFailure(describeLoginError(err));
@@ -113,6 +133,11 @@ export function LoginPage() {
               {submitting ? 'Iniciando sesión...' : 'Iniciar sesión'}
             </Button>
           </form>
+          {DemoAccess && (
+            <Suspense fallback={null}>
+              <DemoAccess onPick={(a) => void quickSignIn(a)} disabled={submitting} />
+            </Suspense>
+          )}
           <p className="mt-6 text-center text-sm text-slate-600">
             ¿Eres investigador o estudiante y no tienes cuenta?{' '}
             <Link to="/signup" className="font-medium text-brand-700 hover:underline">

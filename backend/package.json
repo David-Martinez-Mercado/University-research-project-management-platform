@@ -13,6 +13,9 @@
     "db:migrate:dev": "prisma migrate dev",
     "db:generate": "prisma generate",
     "db:smoke": "tsx scripts/db-smoke-test.ts",
+    "db:seed-demo": "tsx scripts/seed-demo.ts",
+    "db:seed-demo-data": "tsx scripts/seed-demo-data.ts",
+    "db:seed": "tsx scripts/seed-demo.ts && tsx scripts/seed-demo-data.ts",
     "test:files": "node scripts/run-tests-by-file.mjs"
   },
   "dependencies": {

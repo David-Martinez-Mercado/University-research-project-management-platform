@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { tokenStore } from '../auth/tokenStore';
@@ -129,5 +129,24 @@ describe('LoginPage', () => {
     await submit('rita@example.edu', 'whatever');
 
     expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo contactar al servidor');
+  });
+
+  it('offers one-click demo sign-in for every role (development only)', async () => {
+    const fetchMock = stubApi({
+      'POST /auth/login': () => jsonResponse(200, { token: 'jwt-1', expiresInSeconds: 1800, user: TEST_USER }),
+      'GET /projects': () => jsonResponse(200, { data: [], total: 0, limit: 10, offset: 0 }),
+      'GET /notifications': () => jsonResponse(200, { data: [], total: 0, unread: 0, limit: 1, offset: 0 }),
+    });
+    renderApp('/login');
+
+    const section = await screen.findByRole('region', { name: 'Acceso rápido de demostración' });
+    for (const label of ['Administrador', 'Usuario (dueño)', 'Usuario (colaborador)', 'Revisor de proyecto', 'Revisor de avances']) {
+      expect(within(section).getByText(`Entrar como ${label}`)).toBeInTheDocument();
+    }
+
+    await userEvent.setup().click(within(section).getByRole('button', { name: /Entrar como Revisor de proyecto/ }));
+    expect(await screen.findByRole('heading', { name: 'Mis proyectos' })).toBeInTheDocument();
+    const login = fetchMock.mock.calls.find(([u]) => /\/auth\/login$/.test(String(u)))!;
+    expect(JSON.parse(String(login[1]?.body))).toEqual({ email: 'juez@demo.edu', password: 'JuezDemo12345' });
   });
 });

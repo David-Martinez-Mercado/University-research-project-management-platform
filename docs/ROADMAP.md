@@ -139,3 +139,9 @@ Implementado en backend y frontend: evaluaciones con borrador (`POST /evaluation
 Reglas decididas: el juez solo califica con el proyecto `UNDER_EVALUATION` (lo inicia un admin); cuando el último juez envía, el proyecto pasa solo a `EVALUATED` y ahí se publican los resultados (BR-003); los comentarios son anónimos salvo para el admin.
 
 **Pendiente / limitaciones:** `LLM_PROVIDER=mock` y embeddings simulados (sin llave de proveedor, el asistente solo cita fragmentos); umbral `AI_MIN_SIMILARITY` sin afinar con el conjunto de prueba (AIR-001/004); retención de 12 meses de la bitácora (AIR-008) sin tarea programada; correo electrónico de notificaciones no implementado (solo in-app); sin revisión manual con lector de pantalla ni teléfono real.
+
+---
+
+## Datos de demostración (18 nov)
+
+`npm run db:seed` (en `backend/`) crea las 5 cuentas demo y 4 proyectos en distintas etapas con colaboradores, documentos indexados, hitos, rúbrica, asignaciones, un borrador de evaluación, una evaluación terminada, vínculos de inversionista, notificaciones y bitácora de IA. Es re-ejecutable (reconstruye solo los proyectos demo) y se niega a correr con `NODE_ENV=production`. Detalle en `backend/scripts/seed-demo.ts` y `seed-demo-data.ts`.
